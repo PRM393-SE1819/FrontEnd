@@ -4,6 +4,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'api_config.dart';
 import 'profile_screen.dart';
+import 'register_screen.dart';
+import 'reset_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -105,44 +107,107 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _showForgotPasswordDialog() {
+    final emailResetController = TextEditingController();
+    bool isSendingReset = false;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: const Text("Reset Password", style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text("Enter your email to receive a reset link."),
-            const SizedBox(height: 15),
-            TextField(
-              decoration: InputDecoration(
-                labelText: "Email address",
-                filled: true,
-                fillColor: inputBgColor,
-                prefixIcon: const Icon(Icons.email_outlined),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            title: const Text("Reset Password", style: TextStyle(fontWeight: FontWeight.bold)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text("Enter your email to receive a reset link."),
+                const SizedBox(height: 15),
+                TextField(
+                  controller: emailResetController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(
+                    labelText: "Email address",
+                    filled: true,
+                    fillColor: inputBgColor,
+                    prefixIcon: const Icon(Icons.email_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
                 ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text("Cancel", style: TextStyle(color: Colors.grey[600]))
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text("Cancel", style: TextStyle(color: Colors.grey[600]))
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(
-                backgroundColor: primaryGreen,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
-            ),
-            child: const Text("Send", style: TextStyle(color: Colors.white)),
-          ),
-        ],
+              ElevatedButton(
+                onPressed: isSendingReset ? null : () async {
+                  String email = emailResetController.text.trim();
+                  if (!_isValidEmail(email)) {
+                    _showErrorSnackBar("Email không hợp lệ");
+                    return;
+                  }
+                  
+                  setDialogState(() {
+                    isSendingReset = true;
+                  });
+                  
+                  try {
+                    final response = await http.post(
+                      Uri.parse("${ApiConfig.baseUrl}/Auth/request-password-reset"),
+                      headers: {"Content-Type": "application/json"},
+                      body: jsonEncode({"email": email}),
+                    );
+                    
+                    final responseData = jsonDecode(response.body);
+                    
+                    if (response.statusCode == 200) {
+                      if (context.mounted) {
+                        Navigator.pop(context); // Close dialog
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(responseData['message'] ?? "Vui lòng check email để lấy link reset!"),
+                            backgroundColor: Colors.green,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                        // Navigate to Reset Password Screen
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const ResetPasswordScreen()),
+                        );
+                      }
+                    } else {
+                      setDialogState(() {
+                        isSendingReset = false;
+                      });
+                      _showErrorSnackBar(responseData['message'] ?? "Lỗi gửi yêu cầu");
+                    }
+                  } catch (e) {
+                    setDialogState(() {
+                      isSendingReset = false;
+                    });
+                    _showErrorSnackBar("Lỗi kết nối server: $e");
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryGreen,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
+                ),
+                child: isSendingReset
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      )
+                    : const Text("Send", style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        }
       ),
     );
   }
@@ -349,6 +414,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       Text("Don't have an account? ", style: TextStyle(color: Colors.grey[700])),
                       GestureDetector(
                         onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const RegisterScreen()),
+                          );
                         },
                         child: Text(
                           "Sign Up",

@@ -158,6 +158,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 height: 55,
                 child: OutlinedButton(
                   onPressed: () async {
+                    try {
+                      String? token = await _storage.read(key: 'jwt_token');
+                      if (token != null) {
+                        await http.post(
+                          Uri.parse("${ApiConfig.baseUrl}/Auth/logout"),
+                          headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": "Bearer $token",
+                          },
+                        );
+                      }
+                    } catch (e) {
+                      debugPrint("Backend logout failed: $e");
+                    }
+
                     await _storage.deleteAll();
                     if (mounted) {
                       Navigator.pushAndRemoveUntil(

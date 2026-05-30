@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:project_fe/login_screen.dart';
-import 'profile_screen.dart';
+import 'login_screen.dart';
+import 'reset_password_screen.dart';
 
 void main() => runApp(const NutriAIApp());
 
@@ -9,14 +9,28 @@ class NutriAIApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Read the query parameter 'token' from the URL (extremely useful for Flutter Web password resets)
+    String? resetToken;
+    try {
+      resetToken = Uri.base.queryParameters['token'];
+    } catch (_) {
+      // In case Uri.base is not supported or throws on some platforms
+    }
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'NutriAI',
       theme: ThemeData(
         useMaterial3: true,
-        primaryColor: Colors.teal,
+        primaryColor: const Color(0xFF006D44),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF006D44),
+          primary: const Color(0xFF006D44),
+        ),
       ),
-      home: LoginScreen(),
+      home: resetToken != null
+          ? ResetPasswordScreen(initialToken: resetToken)
+          : const LoginScreen(),
     );
   }
 }
