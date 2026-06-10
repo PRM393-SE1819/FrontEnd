@@ -1,21 +1,36 @@
 import 'package:flutter/material.dart';
-import 'login_screen.dart';
-import 'reset_password_screen.dart';
+import 'di/dependency_injection.dart';
+import 'features/auth/presentation/screens/login_screen.dart';
+import 'features/auth/presentation/screens/reset_password_screen.dart';
+import 'features/auth/presentation/screens/verify_email_screen.dart';
 
-void main() => runApp(const NutriAIApp());
+void main() {
+  setupDependencyInjection();
+  runApp(const NutriAIApp());
+}
 
 class NutriAIApp extends StatelessWidget {
   const NutriAIApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Read the query parameter 'token' from the URL (extremely useful for Flutter Web password resets)
-    String? resetToken;
+    String? token;
+    String? email;
+    bool isVerifyEmailUrl = false;
+    bool isResetPasswordUrl = false;
+
     try {
-      resetToken = Uri.base.queryParameters['token'];
-    } catch (_) {
-      // In case Uri.base is not supported or throws on some platforms
-    }
+      final uri = Uri.base;
+      token = uri.queryParameters['token'];
+      email = uri.queryParameters['email'];
+      
+      final fullUrlString = uri.toString();
+      if (fullUrlString.contains('verify-email')) {
+        isVerifyEmailUrl = true;
+      } else if (fullUrlString.contains('reset-password') || (token != null && email == null)) {
+        isResetPasswordUrl = true;
+      }
+    } catch (_) {}
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -28,9 +43,11 @@ class NutriAIApp extends StatelessWidget {
           primary: const Color(0xFF006D44),
         ),
       ),
-      home: resetToken != null
-          ? ResetPasswordScreen(initialToken: resetToken)
-          : const LoginScreen(),
+      home: isVerifyEmailUrl && email != null && token != null
+          ? VerifyEmailScreen(email: email, initialToken: token)
+          : isResetPasswordUrl && token != null
+              ? ResetPasswordScreen(initialToken: token)
+              : const LoginScreen(),
     );
   }
 }

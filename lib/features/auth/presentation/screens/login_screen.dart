@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:http/http.dart' as http;
-import 'api_config.dart';
-import 'profile_screen.dart';
+import '../../../../di/dependency_injection.dart';
+import '../../../../routes/main_navigation.dart';
+import '../../domain/repositories/auth_repository.dart';
 import 'register_screen.dart';
 import 'reset_password_screen.dart';
 
@@ -19,10 +19,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   final _storage = const FlutterSecureStorage();
 
-
   bool _obscurePassword = true;
 
-  // Màu sắc chủ đạo (Lấy theo Figma)
+  // Design Tokens (Matching Figma/Stitch design)
   final Color primaryGreen = const Color(0xFF006D44);
   final Color textDark = const Color(0xFF2D3748);
   final Color inputBgColor = const Color(0xFFF7FAFC);
@@ -56,21 +55,12 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     try {
-      final response = await http.post(
-        Uri.parse("${ApiConfig.baseUrl}/Auth/login"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "email": email,
-          "password": password,
-        }),
-      );
+      final data = await getIt<AuthRepository>().login(email, password);
 
       if (!mounted) return;
       Navigator.pop(context);
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-
+      if (data != null && data['token'] != null) {
         String token = data['token'];
         String name = data['userName'] ?? email.split('@')[0];
 
@@ -83,11 +73,23 @@ class _LoginScreenState extends State<LoginScreen> {
 
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const ProfileScreen()),
+          MaterialPageRoute(builder: (context) => const MainNavigationContainer()),
         );
       } else {
-        final errorData = jsonDecode(response.body);
-        _showErrorSnackBar(errorData['message'] ?? "Đăng nhập thất bại");
+        if (data != null && data['errors'] != null) {
+          final errorsMap = data['errors'] as Map<String, dynamic>;
+          List<String> allErrors = [];
+          errorsMap.forEach((key, val) {
+            if (val is List) {
+              allErrors.addAll(val.map((e) => e.toString()));
+            } else {
+              allErrors.add(val.toString());
+            }
+          });
+          _showErrorSnackBar(allErrors.join('\n'));
+        } else {
+          _showErrorSnackBar(data?['message'] ?? "Đăng nhập thất bại");
+        }
       }
     } catch (e) {
       if (!mounted) return;
@@ -150,21 +152,15 @@ class _LoginScreenState extends State<LoginScreen> {
                     _showErrorSnackBar("Email không hợp lệ");
                     return;
                   }
-                  
+
                   setDialogState(() {
                     isSendingReset = true;
                   });
-                  
+
                   try {
-                    final response = await http.post(
-                      Uri.parse("${ApiConfig.baseUrl}/Auth/request-password-reset"),
-                      headers: {"Content-Type": "application/json"},
-                      body: jsonEncode({"email": email}),
-                    );
-                    
-                    final responseData = jsonDecode(response.body);
-                    
-                    if (response.statusCode == 200) {
+                    final responseData = await getIt<AuthRepository>().requestPasswordReset(email);
+
+                    if (responseData != null) {
                       if (context.mounted) {
                         Navigator.pop(context); // Close dialog
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -184,7 +180,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       setDialogState(() {
                         isSendingReset = false;
                       });
-                      _showErrorSnackBar(responseData['message'] ?? "Lỗi gửi yêu cầu");
+                      _showErrorSnackBar("Lỗi gửi yêu cầu");
                     }
                   } catch (e) {
                     setDialogState(() {
@@ -215,7 +211,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -238,7 +233,6 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-
                   Text(
                     "NutriAI",
                     style: TextStyle(
@@ -254,7 +248,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: TextStyle(fontSize: 15, color: Colors.grey[700]),
                   ),
                   const SizedBox(height: 35),
-
 
                   Container(
                     padding: const EdgeInsets.all(24),
@@ -279,7 +272,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         const SizedBox(height: 25),
-
 
                         Text("Email Address", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey[700])),
                         const SizedBox(height: 8),
@@ -329,7 +321,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
 
-
                         Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
@@ -342,7 +333,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 10),
 
-
                         SizedBox(
                           width: double.infinity,
                           height: 50,
@@ -353,8 +343,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               elevation: 0,
                             ),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                            child: const Wrap(
+                              alignment: WrapAlignment.center,
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
                                 Text("Sign In", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                                 SizedBox(width: 8),
@@ -364,7 +355,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         const SizedBox(height: 25),
-
 
                         Row(
                           children: [
@@ -378,23 +368,21 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 20),
 
-
                         SizedBox(
                           width: double.infinity,
                           height: 50,
                           child: OutlinedButton(
                             onPressed: () {
-
                               _showErrorSnackBar("Chức năng Google đang được phát triển!");
                             },
                             style: OutlinedButton.styleFrom(
                               side: BorderSide(color: Colors.grey[300]!),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                            child: Wrap(
+                              alignment: WrapAlignment.center,
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
-
                                 Text("G", style: TextStyle(color: Colors.blue[600], fontSize: 20, fontWeight: FontWeight.bold)),
                                 const SizedBox(width: 10),
                                 Text("Google", style: TextStyle(color: textDark, fontSize: 16, fontWeight: FontWeight.w600)),
@@ -408,8 +396,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 30),
 
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text("Don't have an account? ", style: TextStyle(color: Colors.grey[700])),
                       GestureDetector(

@@ -1,39 +1,31 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'api_config.dart';
+import '../../../../di/dependency_injection.dart';
+import '../../domain/repositories/auth_repository.dart';
 import 'login_screen.dart';
+import 'verify_email_screen.dart';
 
-class ResetPasswordScreen extends StatefulWidget {
-  final String? initialToken;
-
-  const ResetPasswordScreen({super.key, this.initialToken});
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
+class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _tokenController = TextEditingController();
+  final _fullNameController = TextEditingController();
+  final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
 
   bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
   bool _isLoading = false;
 
+  // Design Tokens (Matching FIGMA / Stitch design)
   final Color primaryGreen = const Color(0xFF006D44);
   final Color textDark = const Color(0xFF2D3748);
   final Color inputBgColor = const Color(0xFFF7FAFC);
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.initialToken != null) {
-      _tokenController.text = widget.initialToken!;
-    }
-  }
 
   // Password validation: At least 8 chars, 1 uppercase, 1 lowercase, 1 digit, 1 special char (@$!%*?&)
   bool _hasLength(String text) => text.length >= 8;
@@ -41,54 +33,78 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   bool _hasLowercase(String text) => RegExp(r'[a-z]').hasMatch(text);
   bool _hasDigit(String text) => RegExp(r'\d').hasMatch(text);
   bool _hasSpecialChar(String text) => RegExp(r'[@$!%*?&]').hasMatch(text);
+  bool _hasOnlyAllowedChars(String text) => text.isEmpty || RegExp(r'^[A-Za-z\d@$!%*?&]+$').hasMatch(text);
 
   bool _isValidPassword(String password) {
     return _hasLength(password) &&
         _hasUppercase(password) &&
         _hasLowercase(password) &&
         _hasDigit(password) &&
-        _hasSpecialChar(password);
+        _hasSpecialChar(password) &&
+        _hasOnlyAllowedChars(password);
   }
 
-  Future<void> _handleResetPassword() async {
+  bool _isValidUsername(String username) {
+    return username.length >= 3 && username.length <= 50 && RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(username);
+  }
+
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
+  }
+
+  Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    String token = _tokenController.text.trim();
-    String newPassword = _passwordController.text.trim();
+    String fullName = _fullNameController.text.trim();
+    String username = _usernameController.text.trim();
+    String email = _emailController.text.trim();
+    String password = _passwordController.text.trim();
 
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final response = await http.post(
-        Uri.parse("${ApiConfig.baseUrl}/Auth/reset-password"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "token": token,
-          "newPassword": newPassword,
-        }),
+      final responseData = await getIt<AuthRepository>().register(
+        fullName,
+        username,
+        email,
+        password,
       );
 
       setState(() {
         _isLoading = false;
       });
 
-      final responseData = jsonDecode(response.body);
-
-      if (response.statusCode == 200) {
-        _showSuccessSnackBar(responseData['message'] ?? "Đặt lại mật khẩu thành công!");
+      if (responseData != null && responseData['statusCode'] == 200) {
+        _showSuccessSnackBar(responseData['message'] ?? "Đăng ký thành công! Hãy xác thực email.");
+        
+        // Navigate to OTP Verification Screen
         if (mounted) {
-          Navigator.pushAndRemoveUntil(
+          Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const LoginScreen()),
-            (route) => false,
+            MaterialPageRoute(
+              builder: (context) => VerifyEmailScreen(email: email),
+            ),
           );
         }
       } else {
-        _showErrorSnackBar(responseData['message'] ?? "Không thể đặt lại mật khẩu");
+        if (responseData != null && responseData['errors'] != null) {
+          final errorsMap = responseData['errors'] as Map<String, dynamic>;
+          List<String> allErrors = [];
+          errorsMap.forEach((key, val) {
+            if (val is List) {
+              allErrors.addAll(val.map((e) => e.toString()));
+            } else {
+              allErrors.add(val.toString());
+            }
+          });
+          _showErrorSnackBar(allErrors.join('\n'));
+        } else {
+          _showErrorSnackBar(responseData?['message'] ?? "Đăng ký thất bại");
+        }
       }
     } catch (e) {
       setState(() {
@@ -145,15 +161,17 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    // Logo and Title
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Icon(Icons.lock_reset, color: primaryGreen, size: 44),
+                        Icon(Icons.spa, color: primaryGreen, size: 40),
                         const SizedBox(width: 8),
                         Text(
-                          "Reset Password",
+                          "NutriAI",
                           style: TextStyle(
-                            fontSize: 32,
+                            fontSize: 36,
                             fontWeight: FontWeight.w800,
                             color: primaryGreen,
                             letterSpacing: -0.5,
@@ -163,12 +181,13 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      "Enter your reset token and your new password below.",
+                      "Create your account to start your journey",
                       style: TextStyle(fontSize: 15, color: Colors.grey[700]),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 30),
 
+                    // Registration Card
                     Container(
                       padding: const EdgeInsets.all(28),
                       decoration: BoxDecoration(
@@ -189,9 +208,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                           children: [
                             const Center(
                               child: Text(
-                                "Create New Password",
+                                "Create Account",
                                 style: TextStyle(
-                                  fontSize: 20,
+                                  fontSize: 22,
                                   fontWeight: FontWeight.bold,
                                   color: Color(0xFF2D3748),
                                 ),
@@ -199,9 +218,52 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                             ),
                             const SizedBox(height: 25),
 
-                            // Token Field
+                            // Full Name Field
                             Text(
-                              "Reset Token",
+                              "Full Name",
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey[700],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextFormField(
+                              controller: _fullNameController,
+                              textCapitalization: TextCapitalization.words,
+                              decoration: InputDecoration(
+                                hintText: "e.g. Jane Doe",
+                                hintStyle: TextStyle(color: Colors.grey[400]),
+                                prefixIcon: const Icon(Icons.person_outline, color: Colors.grey),
+                                filled: true,
+                                fillColor: inputBgColor,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                              validator: (value) {
+                                final val = value?.trim() ?? "";
+                                if (val.isEmpty) {
+                                  return "Họ và tên không được để trống";
+                                }
+                                if (val.length < 2) {
+                                  return "Họ và tên phải có ít nhất 2 ký tự";
+                                }
+                                if (val.length > 100) {
+                                  return "Họ và tên không được vượt quá 100 ký tự";
+                                }
+                                if (!RegExp(r'^[\p{L}\s]+$', unicode: true).hasMatch(val)) {
+                                  return "Họ và tên chỉ được chứa chữ cái và khoảng trắng";
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Username Field
+                            Text(
+                              "Username",
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -210,12 +272,54 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                             ),
                             const SizedBox(height: 8),
                             TextFormField(
-                              controller: _tokenController,
-                              maxLines: 2,
+                              controller: _usernameController,
                               decoration: InputDecoration(
-                                hintText: "Paste token from email link",
+                                hintText: "e.g. janedoe_99",
                                 hintStyle: TextStyle(color: Colors.grey[400]),
-                                prefixIcon: const Icon(Icons.vpn_key_outlined, color: Colors.grey),
+                                prefixIcon: const Icon(Icons.alternate_email, color: Colors.grey),
+                                filled: true,
+                                fillColor: inputBgColor,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                              validator: (value) {
+                                final val = value?.trim() ?? "";
+                                if (val.isEmpty) {
+                                  return "Tên đăng nhập không được để trống";
+                                }
+                                if (val.length < 3) {
+                                  return "Tên đăng nhập phải có ít nhất 3 ký tự";
+                                }
+                                if (val.length > 50) {
+                                  return "Tên đăng nhập không được vượt quá 50 ký tự";
+                                }
+                                if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(val)) {
+                                  return "Chỉ chứa chữ cái, số và dấu gạch dưới";
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Email Field
+                            Text(
+                              "Email Address",
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextFormField(
+                              controller: _emailController,
+                              keyboardType: TextInputType.emailAddress,
+                              decoration: InputDecoration(
+                                hintText: "jane@example.com",
+                                hintStyle: TextStyle(color: Colors.grey[400]),
+                                prefixIcon: const Icon(Icons.email_outlined, color: Colors.grey),
                                 filled: true,
                                 fillColor: inputBgColor,
                                 border: OutlineInputBorder(
@@ -225,16 +329,19 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                               ),
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
-                                  return "Mã xác thực/token không được để trống";
+                                  return "Email không được để trống";
+                                }
+                                if (!_isValidEmail(value.trim())) {
+                                  return "Định dạng email không hợp lệ";
                                 }
                                 return null;
                               },
                             ),
                             const SizedBox(height: 16),
 
-                            // New Password Field
+                            // Password Field
                             Text(
-                              "New Password",
+                              "Password",
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -271,10 +378,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                               ),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return "Mật khẩu mới không được để trống";
+                                  return "Mật khẩu không được để trống";
                                 }
                                 if (!_isValidPassword(value)) {
-                                  return "Mật khẩu yếu. Vui lòng xem yêu cầu bên dưới.";
+                                  return "Yêu cầu: >= 8 ký tự, 1 hoa, 1 thường, 1 số, 1 đặc biệt (@\$!%*?&)";
                                 }
                                 return null;
                               },
@@ -294,64 +401,19 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                                     _buildRuleRow("Chứa chữ thường (a-z)", _hasLowercase(text)),
                                     _buildRuleRow("Chứa số (0-9)", _hasDigit(text)),
                                     _buildRuleRow("Chứa ký tự đặc biệt (@\$!%*?&)", _hasSpecialChar(text)),
+                                    _buildRuleRow("Chỉ dùng ký tự hợp lệ (không chứa dấu cách, #, .)", _hasOnlyAllowedChars(text)),
                                   ],
                                 );
                               },
                             ),
-                            const SizedBox(height: 16),
-
-                            // Confirm Password Field
-                            Text(
-                              "Confirm New Password",
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey[700],
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            TextFormField(
-                              controller: _confirmPasswordController,
-                              obscureText: _obscureConfirmPassword,
-                              decoration: InputDecoration(
-                                hintText: "••••••••",
-                                hintStyle: TextStyle(color: Colors.grey[400]),
-                                prefixIcon: const Icon(Icons.lock_outline, color: Colors.grey),
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _obscureConfirmPassword
-                                        ? Icons.visibility_off_outlined
-                                        : Icons.visibility_outlined,
-                                    color: Colors.grey,
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _obscureConfirmPassword = !_obscureConfirmPassword;
-                                    });
-                                  },
-                                ),
-                                filled: true,
-                                fillColor: inputBgColor,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide.none,
-                                ),
-                              ),
-                              validator: (value) {
-                                if (value != _passwordController.text) {
-                                  return "Mật khẩu xác nhận không khớp";
-                                }
-                                return null;
-                              },
-                            ),
                             const SizedBox(height: 25),
 
-                            // Submit Button
+                            // Sign Up CTA
                             SizedBox(
                               width: double.infinity,
                               height: 50,
                               child: ElevatedButton(
-                                onPressed: _isLoading ? null : _handleResetPassword,
+                                onPressed: _isLoading ? null : _handleRegister,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: primaryGreen,
                                   shape: RoundedRectangleBorder(
@@ -368,13 +430,21 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                                           strokeWidth: 2.5,
                                         ),
                                       )
-                                    : const Text(
-                                        "Save New Password",
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                    : const Wrap(
+                                        alignment: WrapAlignment.center,
+                                        crossAxisAlignment: WrapCrossAlignment.center,
+                                        children: [
+                                          Text(
+                                            "Create Account",
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          SizedBox(width: 8),
+                                          Icon(Icons.arrow_forward, color: Colors.white, size: 20),
+                                        ],
                                       ),
                               ),
                             ),
@@ -384,22 +454,25 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                     ),
                     const SizedBox(height: 30),
 
-                    // Back to Login Link
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(builder: (context) => const LoginScreen()),
-                          (route) => false,
-                        );
-                      },
-                      child: Text(
-                        "Back to Sign In",
-                        style: TextStyle(
-                          color: primaryGreen,
-                          fontWeight: FontWeight.bold,
+                    // Redirect to Login
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text("Already have an account? ", style: TextStyle(color: Colors.grey[700])),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(builder: (context) => const LoginScreen()),
+                            );
+                          },
+                          child: Text(
+                            "Log in",
+                            style: TextStyle(color: primaryGreen, fontWeight: FontWeight.bold),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
@@ -422,11 +495,13 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             size: 14,
           ),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: isMet ? Colors.green[700] : Colors.grey[600],
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: isMet ? Colors.green[700] : Colors.grey[600],
+              ),
             ),
           ),
         ],
@@ -436,9 +511,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   @override
   void dispose() {
-    _tokenController.dispose();
+    _fullNameController.dispose();
+    _usernameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
-    _confirmPasswordController.dispose();
     super.dispose();
   }
 }
