@@ -18,7 +18,6 @@ class _WeightTabState extends State<WeightTab> {
   double? _currentWeight;
   double? _weightChanged;
   double? _targetWeight;
-  double? _weightDiff;
   
   double? _startBodyFat;
   double? _currentBodyFat;
@@ -45,7 +44,6 @@ class _WeightTabState extends State<WeightTab> {
       if (summary != null) {
         _currentWeight = (summary['currentWeight'] as num?)?.toDouble();
         _targetWeight = (summary['targetWeight'] as num?)?.toDouble();
-        _weightDiff = (summary['weightDifference'] as num?)?.toDouble();
         _currentBodyFat = (summary['currentBodyFat'] as num?)?.toDouble();
       }
 

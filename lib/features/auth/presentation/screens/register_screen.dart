@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../../di/dependency_injection.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -42,10 +41,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _hasDigit(password) &&
         _hasSpecialChar(password) &&
         _hasOnlyAllowedChars(password);
-  }
-
-  bool _isValidUsername(String username) {
-    return username.length >= 3 && username.length <= 50 && RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(username);
   }
 
   bool _isValidEmail(String email) {

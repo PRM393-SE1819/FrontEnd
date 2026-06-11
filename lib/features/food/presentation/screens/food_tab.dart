@@ -15,14 +15,11 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
   // Search results
   bool _isSearching = false;
   List<dynamic> _searchResults = [];
-  int _searchTotalPages = 1;
-  int _searchCurrentPage = 1;
 
   // Favorite foods
   bool _isLoadingFavorites = false;
   List<dynamic> _favoriteFoods = [];
 
-  bool _isLoadingCustom = false;
   List<dynamic> _customFoods = []; // We can store local custom foods or search for custom foods.
 
   final Color primaryGreen = const Color(0xFF006D44);
@@ -62,8 +59,6 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
     if (mounted) {
       setState(() {
         _searchResults = results != null ? results['items'] ?? [] : [];
-        _searchTotalPages = results != null ? results['totalPages'] ?? 1 : 1;
-        _searchCurrentPage = results != null ? results['currentPage'] ?? 1 : 1;
         
         _customFoods = _searchResults.where((food) => food['isCustom'] == true || food['foodType'] == 'Custom').toList();
         

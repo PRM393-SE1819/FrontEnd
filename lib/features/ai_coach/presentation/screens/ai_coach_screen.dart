@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -22,9 +21,6 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
 
   bool _isLoading = false;
   bool _isContextLoading = true;
-  bool _isScanningImage = false;
-  Uint8List? _scannedImageBytes;
-  String? _scannedImageBase64;
 
   final List<_ChatMessage> _messages = [];
   final List<Map<String, dynamic>> _conversationHistory = [];
@@ -2210,6 +2206,7 @@ class _ChatMessage {
     required this.isUser,
     required this.timestamp,
     this.isError = false,
+    // ignore: unused_element_parameter
     this.imageBytes,
     this.foodScanResult,
     this.reasoning,
