@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../../di/dependency_injection.dart';
@@ -5,6 +6,9 @@ import '../../../../routes/main_navigation.dart';
 import '../../domain/repositories/auth_repository.dart';
 import 'register_screen.dart';
 import 'reset_password_screen.dart';
+
+// Import màn hình Admin Dashboard của bạn
+import '../../../admin/presentation/screens/admin_dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -34,6 +38,29 @@ class _LoginScreenState extends State<LoginScreen> {
     return password.length >= 6 && hasSpecialChar;
   }
 
+  /// Giải mã payload JWT và kiểm tra role có phải "Admin" không.
+  /// Backend nhúng role vào claim chuẩn của .NET.
+  bool _isAdminToken(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return false;
+      final payload = parts[1];
+      // base64url cần được "pad" cho đủ bội số 4 trước khi decode.
+      final normalized = base64Url.normalize(payload);
+      final decoded = jsonDecode(utf8.decode(base64Url.decode(normalized)))
+          as Map<String, dynamic>;
+      // Thử cả claim ngắn lẫn claim đầy đủ của .NET.
+      final role = decoded['role'] ??
+          decoded['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'];
+      if (role is List) {
+        return role.any((r) => r.toString().toLowerCase() == 'admin');
+      }
+      return role?.toString().toLowerCase() == 'admin';
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> _handleLogin() async {
     String email = _emailController.text.trim();
     String password = _passwordController.text.trim();
@@ -47,12 +74,15 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    // Hiển thị vòng Loading Loading giống hệt thiết kế cũ
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => Center(child: CircularProgressIndicator(color: primaryGreen)),
     );
 
+    // Đăng nhập qua API thật. Token JWT chứa role -> dùng để định tuyến
+    // Admin vào trang quản trị, người dùng thường vào app chính.
     try {
       final data = await getIt<AuthRepository>().login(email, password);
 
@@ -65,6 +95,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
         await _storage.write(key: 'jwt_token', value: token);
         await _storage.write(key: 'user_name', value: name);
+        if (!mounted) return;
+
+        final bool isAdmin = _isAdminToken(token);
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("✅ Chào mừng $name đã đăng nhập!")),
@@ -72,7 +105,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const MainNavigationContainer()),
+          MaterialPageRoute(
+            builder: (context) => isAdmin
+                ? const AdminDashboardScreen()
+                : const MainNavigationContainer(),
+          ),
         );
       } else {
         if (data != null && data['errors'] != null) {
@@ -114,95 +151,95 @@ class _LoginScreenState extends State<LoginScreen> {
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-            title: const Text("Reset Password", style: TextStyle(fontWeight: FontWeight.bold)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text("Enter your email to receive a reset link."),
-                const SizedBox(height: 15),
-                TextField(
-                  controller: emailResetController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    labelText: "Email address",
-                    filled: true,
-                    fillColor: inputBgColor,
-                    prefixIcon: const Icon(Icons.email_outlined),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              title: const Text("Reset Password", style: TextStyle(fontWeight: FontWeight.bold)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text("Enter your email to receive a reset link."),
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: emailResetController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      labelText: "Email address",
+                      filled: true,
+                      fillColor: inputBgColor,
+                      prefixIcon: const Icon(Icons.email_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text("Cancel", style: TextStyle(color: Colors.grey[600]))
+                ],
               ),
-              ElevatedButton(
-                onPressed: isSendingReset ? null : () async {
-                  String email = emailResetController.text.trim();
-                  if (!_isValidEmail(email)) {
-                    _showErrorSnackBar("Email không hợp lệ");
-                    return;
-                  }
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text("Cancel", style: TextStyle(color: Colors.grey[600]))
+                ),
+                ElevatedButton(
+                  onPressed: isSendingReset ? null : () async {
+                    String email = emailResetController.text.trim();
+                    if (!_isValidEmail(email)) {
+                      _showErrorSnackBar("Email không hợp lệ");
+                      return;
+                    }
 
-                  setDialogState(() {
-                    isSendingReset = true;
-                  });
+                    setDialogState(() {
+                      isSendingReset = true;
+                    });
 
-                  try {
-                    final responseData = await getIt<AuthRepository>().requestPasswordReset(email);
+                    try {
+                      final responseData = await getIt<AuthRepository>().requestPasswordReset(email);
 
-                    if (responseData != null) {
-                      if (context.mounted) {
-                        Navigator.pop(context); // Close dialog
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(responseData['message'] ?? "Vui lòng check email để lấy link reset!"),
-                            backgroundColor: Colors.green,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                        // Navigate to Reset Password Screen
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const ResetPasswordScreen()),
-                        );
+                      if (responseData != null) {
+                        if (context.mounted) {
+                          Navigator.pop(context); // Close dialog
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(responseData['message'] ?? "Vui lòng check email để lấy link reset!"),
+                              backgroundColor: Colors.green,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                          // Navigate to Reset Password Screen
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const ResetPasswordScreen()),
+                          );
+                        }
+                      } else {
+                        setDialogState(() {
+                          isSendingReset = false;
+                        });
+                        _showErrorSnackBar("Lỗi gửi yêu cầu");
                       }
-                    } else {
+                    } catch (e) {
                       setDialogState(() {
                         isSendingReset = false;
                       });
-                      _showErrorSnackBar("Lỗi gửi yêu cầu");
+                      _showErrorSnackBar("Lỗi kết nối server: $e");
                     }
-                  } catch (e) {
-                    setDialogState(() {
-                      isSendingReset = false;
-                    });
-                    _showErrorSnackBar("Lỗi kết nối server: $e");
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryGreen,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
+                  },
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryGreen,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
+                  ),
+                  child: isSendingReset
+                      ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  )
+                      : const Text("Send", style: TextStyle(color: Colors.white)),
                 ),
-                child: isSendingReset
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                      )
-                    : const Text("Send", style: TextStyle(color: Colors.white)),
-              ),
-            ],
-          );
-        }
+              ],
+            );
+          }
       ),
     );
   }
