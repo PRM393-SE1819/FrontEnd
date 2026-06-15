@@ -834,7 +834,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                           const SizedBox(height: 8),
                           Text("Khẩu phần: $portion (x$multiplier)", style: TextStyle(fontSize: 13, color: Colors.grey[700])),
                           const SizedBox(height: 12),
-                          if (item['nutrition'] != null) _buildNutritionGrid(item['nutrition']),
+                          if (items.length > 1 && item['nutrition'] != null) _buildNutritionGrid(item['nutrition']),
                           
                           if (ingredients.isNotEmpty) ...[
                             const SizedBox(height: 12),
@@ -1181,35 +1181,37 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
               ),
             ),
             const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _currentSubTab == 0 ? "AI Meal Analysis" : "AI Nutrition Coach",
-                  style: const TextStyle(
-                    color: Color(0xFF2D3748),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _currentSubTab == 0 ? "AI Meal Analysis" : "AI Nutrition Coach",
+                    style: const TextStyle(
+                      color: Color(0xFF2D3748),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
                   ),
-                ),
-                Row(
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF00A86B),
-                        shape: BoxShape.circle,
+                  Row(
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF00A86B),
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      "Online • NutriAI",
-                      style: TextStyle(color: Colors.grey[500], fontSize: 11),
-                    ),
-                  ],
-                ),
-              ],
+                      const SizedBox(width: 4),
+                      Text(
+                        "Online • NutriAI",
+                        style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -1332,12 +1334,14 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                       child: const Icon(Icons.auto_awesome, color: primaryGreen, size: 24),
                     ),
                     const SizedBox(width: 12),
-                    const Text(
-                      "AI Meal Analysis",
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF2D3748),
+                    const Expanded(
+                      child: Text(
+                        "AI Meal Analysis",
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF2D3748),
+                        ),
                       ),
                     ),
                   ],
@@ -1745,39 +1749,93 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
     final calTarget = _userContext!['calorieTarget'] ?? 2000;
     final pct = calTarget > 0 ? (cal / calTarget).clamp(0.0, 1.0) : 0.0;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: lightGreen,
-        border: Border(bottom: BorderSide(color: Colors.green.shade100)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.local_fire_department, color: Colors.orange[700], size: 16),
-          const SizedBox(width: 4),
-          Text(
-            "$cal / $calTarget kcal",
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2D3748)),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: pct,
-                minHeight: 5,
-                backgroundColor: Colors.green.shade100,
-                color: primaryGreen,
-              ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 420;
+
+        if (isNarrow) {
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: lightGreen,
+              border: Border(bottom: BorderSide(color: Colors.green.shade100)),
             ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.local_fire_department, color: Colors.orange[700], size: 16),
+                        const SizedBox(width: 4),
+                        Text(
+                          "$cal / $calTarget kcal",
+                          style: const TextStyle(
+                            fontSize: 12, 
+                            fontWeight: FontWeight.w600, 
+                            color: Color(0xFF2D3748),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      "P: ${_userContext!['protein']}g C: ${_userContext!['carbs']}g F: ${_userContext!['fat']}g",
+                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: pct,
+                    minHeight: 5,
+                    backgroundColor: Colors.green.shade100,
+                    color: primaryGreen,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: lightGreen,
+            border: Border(bottom: BorderSide(color: Colors.green.shade100)),
           ),
-          const SizedBox(width: 8),
-          Text(
-            "P: ${_userContext!['protein']}g  C: ${_userContext!['carbs']}g  F: ${_userContext!['fat']}g",
-            style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+          child: Row(
+            children: [
+              Icon(Icons.local_fire_department, color: Colors.orange[700], size: 16),
+              const SizedBox(width: 4),
+              Text(
+                "$cal / $calTarget kcal",
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2D3748)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: pct,
+                    minHeight: 5,
+                    backgroundColor: Colors.green.shade100,
+                    color: primaryGreen,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                "P: ${_userContext!['protein']}g  C: ${_userContext!['carbs']}g  F: ${_userContext!['fat']}g",
+                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -1921,9 +1979,11 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
           children: [
             const Icon(Icons.check_circle_outline, color: primaryGreen, size: 20),
             const SizedBox(width: 8),
-            Text(
-              "Đã phân tích: $foodName",
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF2D3748)),
+            Expanded(
+              child: Text(
+                "Đã phân tích: $foodName",
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF2D3748)),
+              ),
             ),
           ],
         ),

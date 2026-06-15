@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'api_config.dart';
 
 class ApiService {
@@ -129,12 +130,17 @@ class ApiService {
     return false;
   }
 
-  // Favorite Foods
   static Future<List<dynamic>?> getFavoriteFoods() async {
     try {
       final response = await get("/favorite-foods");
       if (response.statusCode == 200) {
-        return jsonDecode(response.body) as List<dynamic>;
+        final rawList = jsonDecode(response.body) as List<dynamic>;
+        return rawList.map((item) {
+          if (item is Map && item.containsKey('food') && item['food'] != null) {
+            return item['food'];
+          }
+          return item;
+        }).toList();
       }
     } catch (e) {
       if (kDebugMode) print("Error getting favorite foods: $e");
@@ -353,11 +359,36 @@ class ApiService {
   }
 
   // Water Reminders
+  static Future<void> saveReminderEnabledState(int reminderId, bool isEnabled) async {
+    await _storage.write(key: 'reminder_${reminderId}_enabled', value: isEnabled.toString());
+  }
+
+  static Future<bool> getReminderEnabledState(int reminderId) async {
+    final val = await _storage.read(key: 'reminder_${reminderId}_enabled');
+    return val != 'false'; // Defaults to true if not found/set
+  }
+
   static Future<List<dynamic>?> getWaterReminders() async {
     try {
       final response = await get("/water/reminders");
       if (response.statusCode == 200) {
-        return jsonDecode(response.body) as List<dynamic>;
+        final rawList = jsonDecode(response.body) as List<dynamic>;
+        final updatedList = <dynamic>[];
+        for (var item in rawList) {
+          if (item is Map) {
+            final copy = Map<String, dynamic>.from(item);
+            final remId = copy['reminderId'] as int?;
+            if (remId != null) {
+              copy['isEnabled'] = await getReminderEnabledState(remId);
+            } else {
+              copy['isEnabled'] = true;
+            }
+            updatedList.add(copy);
+          } else {
+            updatedList.add(item);
+          }
+        }
+        return updatedList;
       }
     } catch (e) {
       if (kDebugMode) print("Error getting water reminders: $e");
@@ -604,99 +635,78 @@ class ApiService {
     required List<Map<String, dynamic>> conversationHistory,
     Map<String, dynamic>? userContext,
   }) async {
-    const models = [
-      "google/gemma-4-26b-a4b-it:free",
-      "google/gemini-2.0-flash-exp",
-      "google/gemini-2.0-flash-lite:free",
-      "meta-llama/llama-3.3-70b-instruct:free",
-      "anthropic/claude-3.5-haiku",
-    ];
-
     try {
-      final systemPrompt = """You are NutriAI, a professional AI nutrition coach and dietitian. 
-You help users with:
-- Personalized nutrition advice based on their health data
-- Meal planning and food recommendations
-- Understanding macronutrients (protein, carbs, fat) and micronutrients
-- Calorie management and weight goals
-- Interpreting their nutrition tracking data
-- Healthy eating habits and dietary tips
+      final token = await getToken();
+      final url = Uri.parse("${ApiConfig.baseUrl}/ai/chat");
 
-${userContext != null ? '''
-Current user data:
-- Calories today: ${userContext['calories'] ?? 'N/A'} / ${userContext['calorieTarget'] ?? 'N/A'} kcal
-- Protein: ${userContext['protein'] ?? 'N/A'}g / ${userContext['proteinTarget'] ?? 'N/A'}g
-- Carbs: ${userContext['carbs'] ?? 'N/A'}g / ${userContext['carbTarget'] ?? 'N/A'}g
-- Fat: ${userContext['fat'] ?? 'N/A'}g / ${userContext['fatTarget'] ?? 'N/A'}g
-- Weight: ${userContext['weight'] ?? 'N/A'} kg
-''' : ''}
+      if (kDebugMode) print("Sending Chat Request to Backend: $url");
 
-Respond in the same language as the user. Be concise, friendly, and practical. 
-If the user writes in Vietnamese, respond in Vietnamese. If in English, respond in English.
-Keep responses under 200 words unless detailed analysis is requested.""";
+      final response = await http.post(
+        url,
+        headers: {
+          "Content-Type": "application/json",
+          if (token != null) "Authorization": "Bearer $token",
+        },
+        body: jsonEncode({
+          "message": userMessage,
+        }),
+      );
 
-      final messages = [
-        {"role": "system", "content": systemPrompt},
-        ...conversationHistory,
-        {"role": "user", "content": userMessage},
-      ];
-
-      final apiKey = await getOpenRouterApiKey();
-      if (apiKey.isEmpty) {
-        if (kDebugMode) print("Error: OpenRouter API Key is empty");
-        return null;
+      if (kDebugMode) {
+        print("Backend Chat Response status: ${response.statusCode}");
+        print("Backend Chat Response body: ${response.body}");
       }
 
-      for (final model in models) {
-        try {
-          if (kDebugMode) print("Trying AI model: $model...");
-          final isReasoningModel = model.contains("gemma-4");
-
-          final body = {
-            "model": model,
-            "messages": messages,
-            "max_tokens": 800,
-            "temperature": 0.7,
-          };
-
-          if (isReasoningModel) {
-            body["reasoning"] = {"enabled": true};
-          }
-
-          final response = await http.post(
-            Uri.parse("$_openRouterBaseUrl/chat/completions"),
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": "Bearer $apiKey",
-              "HTTP-Referer": "https://ainutritiontracking.onrender.com",
-              "X-Title": "NutriAI",
-            },
-            body: jsonEncode(body),
-          );
-
-          if (response.statusCode == 200) {
-            final data = jsonDecode(response.body) as Map<String, dynamic>;
-            final choices = data['choices'] as List<dynamic>?;
-            if (choices != null && choices.isNotEmpty) {
-              final message = choices[0]['message'] as Map<String, dynamic>;
-              return {
-                "content": message['content'] as String?,
-                "reasoning_details": message['reasoning_details'],
-              };
-            }
-          } else {
-            if (kDebugMode) {
-              print("AI API Error for model $model: ${response.statusCode} ${response.body}");
-            }
-          }
-        } catch (innerError) {
-          if (kDebugMode) print("Error calling model $model: $innerError");
-        }
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        return {
+          "content": decoded['answer'] ?? decoded['content'] ?? "Không thể nhận phản hồi từ AI.",
+          "reasoning_details": decoded['reasoning_details'] ?? decoded['reasoningDetails'],
+        };
+      } else {
+        if (kDebugMode) print("Backend Chat Error: ${response.statusCode} ${response.body}");
+        return {
+          "content": "Lỗi kết nối máy chủ AI (Code ${response.statusCode}). Vui lòng thử lại sau.",
+          "reasoning_details": null,
+        };
       }
     } catch (e) {
-      if (kDebugMode) print("Error sending AI message: $e");
+      if (kDebugMode) print("Error in sendAiNutritionMessage: $e");
+      return {
+        "content": "Không thể kết nối đến máy chủ AI: $e",
+        "reasoning_details": null,
+      };
     }
-    return null;
+  }
+
+  static Future<String> _translateToVietnamese(String text) async {
+    if (text.isEmpty) return text;
+    try {
+      final token = await getToken();
+      final url = Uri.parse("${ApiConfig.baseUrl}/ai/chat");
+      final response = await http.post(
+        url,
+        headers: {
+          "Content-Type": "application/json",
+          if (token != null) "Authorization": "Bearer $token",
+        },
+        body: jsonEncode({
+          "message": "Dịch cụm từ hoặc câu này sang tiếng Việt (chỉ trả về bản dịch tiếng Việt duy nhất, không thêm bất kỳ bình luận hay văn bản giải thích nào khác): \"$text\"",
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        final answer = (decoded['answer'] ?? decoded['content'] ?? "").toString().trim();
+        if (answer.startsWith('"') && answer.endsWith('"')) {
+          return answer.substring(1, answer.length - 1);
+        }
+        return answer.isNotEmpty ? answer : text;
+      }
+    } catch (_) {
+      // Fallback
+    }
+    return text;
   }
 
   static Future<String?> analyzeFoodImage({
@@ -705,124 +715,129 @@ Keep responses under 200 words unless detailed analysis is requested.""";
     Map<String, dynamic>? userContext,
   }) async {
     try {
-      final contextNote = userContext != null
-          ? "User's current nutrition today: ${userContext['calories']}/${userContext['calorieTarget']} kcal, "
-              "Protein: ${userContext['protein']}g/${userContext['proteinTarget']}g, "
-              "Carbs: ${userContext['carbs']}g/${userContext['carbTarget']}g, "
-              "Fat: ${userContext['fat']}g/${userContext['fatTarget']}g."
-          : "No context available.";
+      final token = await getToken();
+      final url = Uri.parse("${ApiConfig.baseUrl}/ai/analyze-image");
 
-      final prompt = """
-You are a professional nutritionist and food recognition expert. Analyze food images and return ONLY a valid JSON object. Identify all food items visible in the image and estimate portion size based on visual cues such as plate size, hand reference, and utensils. Use standard Vietnamese and Asian food database when applicable. If uncertain about a dish, provide the closest match with a confidence score. Never return explanatory text outside the JSON structure.
+      final request = http.MultipartRequest("POST", url);
 
-USER PROMPT — Scan món ăn:
-Analyze this food image and return the dish name in both Vietnamese and English, a confidence score from 0 to 1, estimated portion size, and per-serving nutrition including calories, protein in grams, carbohydrates in grams, fat in grams, fiber in grams, and sodium in milligrams. Also return a list of detected ingredients, dietary flags for vegetarian, vegan, gluten-free, and high-protein, and up to 2 alternative dish guesses with their confidence scores if uncertain.
-
-USER PROMPT — Nhiều món trong 1 ảnh:
-This image contains multiple food items. Analyze each item separately and return the name, portion, calories, protein, carbs, and fat for each. Also return the total calories across all items and a meal type suggestion — breakfast, lunch, dinner, or snack.
-
-USER PROMPT — Ước lượng khẩu phần:
-Based on the image, compare the plate or bowl size to a standard reference, account for visible density and stacking, and estimate the actual portion as a multiplier — for example 0.5 for half a serving or 1.5 for one and a half servings. Return the multiplier, estimated weight in grams, and a brief note.
-
-USER PROMPT — Ảnh không rõ / fallback:
-If the image does not clearly show food or the confidence is below 0.4, return an error response indicating low confidence, a message in Vietnamese saying the dish could not be recognized, and a suggestion to retake the photo with better lighting or from a top-down angle.
-
-Context information about the user:
-$contextNote
-
-Your response MUST be a single, valid JSON object following this exact schema:
-{
-  "success": true / false,
-  "confidence": 0.0 to 1.0,
-  "message": "Vietnamese description of result or scan note",
-  "meal_type": "breakfast" / "lunch" / "dinner" / "snack",
-  "total_nutrition": {
-    "calories": integer,
-    "protein": double (g),
-    "carbs": double (g),
-    "fat": double (g),
-    "fiber": double (g),
-    "sodium": double (mg)
-  },
-  "items": [
-    {
-      "name_vi": "Vietnamese Name",
-      "name_en": "English Name",
-      "portion_size": "1 plate/1 bowl etc",
-      "portion_multiplier": double (e.g. 1.0, 0.5, 1.2),
-      "weight_grams": double,
-      "nutrition": {
-        "calories": integer,
-        "protein": double,
-        "carbs": double,
-        "fat": double,
-        "fiber": double,
-        "sodium": double
-      },
-      "ingredients": ["ingredient 1", "ingredient 2"],
-      "dietary_flags": {
-        "vegetarian": true/false,
-        "vegan": true/false,
-        "gluten_free": true/false,
-        "high_protein": true/false
+      if (token != null) {
+        request.headers["Authorization"] = "Bearer $token";
       }
-    }
-  ],
-  "alternatives": [
-    {
-      "name": "Alternative dish name",
-      "confidence": double
-    }
-  ],
-  "health_rating": "Tốt" / "Trung bình" / "Hạn chế",
-  "advice": "Vietnamese advice tailored to user's daily goals"
-}
-""";
 
-      final apiKey = await getOpenRouterApiKey();
-      final response = await http.post(
-        Uri.parse("$_openRouterBaseUrl/chat/completions"),
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer $apiKey",
-          "HTTP-Referer": "https://ainutritiontracking.onrender.com",
-          "X-Title": "NutriAI",
-        },
-        body: jsonEncode({
-          "model": "google/gemini-2.0-flash-exp:free",
-          "messages": [
-            {
-              "role": "user",
-              "content": [
-                {
-                  "type": "image_url",
-                  "image_url": {
-                    "url": "data:$mimeType;base64,$imageBase64",
-                  },
-                },
-                {
-                  "type": "text",
-                  "text": prompt,
-                },
-              ],
-            }
-          ],
-          "max_tokens": 800,
-        }),
+      final bytes = base64Decode(imageBase64);
+      final multipartFile = http.MultipartFile.fromBytes(
+        'Image',
+        bytes,
+        filename: 'meal_image.jpg',
+        contentType: MediaType.parse(mimeType),
       );
 
+      request.files.add(multipartFile);
+
+      if (kDebugMode) print("Sending multipart request to: $url");
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (kDebugMode) {
+        print("Backend Response: ${response.statusCode} - ${response.body}");
+      }
+
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final choices = data['choices'] as List<dynamic>?;
-        if (choices != null && choices.isNotEmpty) {
-          return choices[0]['message']['content'] as String?;
-        }
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        
+        final rawFoodName = decoded['foodName'] ?? "Món ăn";
+        final rawDescription = decoded['description'] ?? "";
+
+        // Run translations in parallel for speed!
+        final translations = await Future.wait([
+          _translateToVietnamese(rawFoodName),
+          _translateToVietnamese(rawDescription),
+        ]);
+
+        final foodNameVi = translations[0];
+        final descriptionVi = translations[1];
+
+        final rawWarnings = decoded['warnings'] as List? ?? [];
+        final translatedWarnings = rawWarnings.map((w) {
+          final str = w.toString();
+          if (str.contains("HIGH CALORIES")) {
+            return str
+                .replaceAll("⚠️ HIGH CALORIES:", "⚠️ CALO CAO:")
+                .replaceAll("exceeds", "vượt quá")
+                .replaceAll("kcal per meal.", "kcal mỗi bữa ăn.");
+          } else if (str.contains("HIGH PROTEIN")) {
+            return str
+                .replaceAll("⚠️ HIGH PROTEIN:", "⚠️ ĐẠM CAO:")
+                .replaceAll("per meal may strain kidneys.", "mỗi bữa ăn có thể gây áp lực cho thận.");
+          } else if (str.contains("HIGH CARBS")) {
+            return str
+                .replaceAll("⚠️ HIGH CARBS:", "⚠️ CARB CAO:")
+                .replaceAll("per meal may spike blood sugar.", "mỗi bữa ăn có thể làm tăng đường huyết nhanh.");
+          } else if (str.contains("HIGH FAT")) {
+            return str
+                .replaceAll("⚠️ HIGH FAT:", "⚠️ CHẤT BÉO CAO:")
+                .replaceAll("per meal increases cardiovascular risk.", "mỗi bữa ăn làm tăng nguy cơ tim mạch.");
+          }
+          return str;
+        }).toList();
+
+        // Map backend's FoodImageAnalysisResponseDto to the frontend's expected schema
+        final mappedJson = {
+          "success": true,
+          "confidence": 0.95,
+          "message": "Phát hiện món: $foodNameVi",
+          "meal_type": "lunch",
+          "total_nutrition": {
+            "calories": (decoded['estimatedCalories'] as num?)?.round() ?? 0,
+            "protein": (decoded['protein'] as num?)?.toDouble() ?? 0.0,
+            "carbs": (decoded['carbs'] as num?)?.toDouble() ?? 0.0,
+            "fat": (decoded['fat'] as num?)?.toDouble() ?? 0.0,
+            "fiber": 0.0,
+            "sodium": 0.0
+          },
+          "items": [
+            {
+              "name_vi": foodNameVi,
+              "name_en": rawFoodName,
+              "portion_size": "1 phần",
+              "portion_multiplier": 1.0,
+              "weight_grams": 100.0,
+              "nutrition": {
+                "calories": (decoded['estimatedCalories'] as num?)?.round() ?? 0,
+                "protein": (decoded['protein'] as num?)?.toDouble() ?? 0.0,
+                "carbs": (decoded['carbs'] as num?)?.toDouble() ?? 0.0,
+                "fat": (decoded['fat'] as num?)?.toDouble() ?? 0.0,
+                "fiber": 0.0,
+                "sodium": 0.0
+              },
+              "ingredients": [],
+              "dietary_flags": {
+                "vegetarian": false,
+                "vegan": false,
+                "gluten_free": false,
+                "high_protein": ((decoded['protein'] as num?)?.toDouble() ?? 0.0) >= 20.0
+              }
+            }
+          ],
+          "alternatives": [],
+          "health_rating": translatedWarnings.isNotEmpty ? "Hạn chế" : "Tốt",
+          "advice": "$descriptionVi${translatedWarnings.isNotEmpty ? '\nCảnh báo:\n' + translatedWarnings.join('\n') : ''}"
+        };
+
+        return jsonEncode(mappedJson);
       } else {
-        if (kDebugMode) print("Vision API Error: ${response.statusCode} ${response.body}");
+        if (kDebugMode) print("Backend Image Analysis Error: ${response.statusCode} ${response.body}");
+        return jsonEncode({
+          "success": false,
+          "message": "Có lỗi từ máy chủ phân tích ảnh: Code ${response.statusCode}"
+        });
       }
     } catch (e) {
       if (kDebugMode) print("Error analyzing food image: $e");
+      return jsonEncode({
+        "success": false,
+        "message": "Không thể kết nối đến máy chủ: $e"
+      });
     }
-    return null;
   }
 }

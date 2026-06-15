@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/network/api_service.dart';
@@ -19,6 +20,10 @@ class _WaterTabState extends State<WaterTab> {
   List<dynamic> _logs = [];
   List<dynamic> _reminders = [];
 
+  // Reminder Timer and Checkers
+  Timer? _reminderTimer;
+  final Set<String> _notifiedTimes = {};
+
   final Color primaryGreen = const Color(0xFF006D44);
   final Color waterBlue = const Color(0xFF0284C7);
 
@@ -26,6 +31,7 @@ class _WaterTabState extends State<WaterTab> {
   void initState() {
     super.initState();
     _loadWaterData();
+    _startReminderCheck();
   }
 
   Future<void> _loadWaterData() async {
@@ -189,6 +195,75 @@ class _WaterTabState extends State<WaterTab> {
         const SnackBar(content: Text("Reminder deleted")),
       );
     }
+  }
+
+  void _startReminderCheck() {
+    _reminderTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
+      if (!mounted) return;
+      final now = DateTime.now();
+      final currentHourMin = DateFormat('HH:mm').format(now);
+      
+      // Clean up past entries from cache
+      _notifiedTimes.removeWhere((time) => time != currentHourMin);
+
+      for (final reminder in _reminders) {
+        final isEnabled = reminder['isEnabled'] ?? true;
+        if (!isEnabled) continue;
+
+        final reminderTimeStr = reminder['reminderTime'] ?? '';
+        if (reminderTimeStr.isEmpty) continue;
+
+        final parts = reminderTimeStr.split(':');
+        if (parts.isEmpty) continue;
+        final hour = parts[0].padLeft(2, '0');
+        final min = parts.length > 1 ? parts[1].padLeft(2, '0') : '00';
+        final remHourMin = "$hour:$min";
+
+        if (remHourMin == currentHourMin && !_notifiedTimes.contains(currentHourMin)) {
+          _notifiedTimes.add(currentHourMin);
+          _showWaterReminderAlert(remHourMin);
+        }
+      }
+    });
+  }
+
+  void _showWaterReminderAlert(String time) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Icon(Icons.local_drink, color: waterBlue, size: 28),
+              const SizedBox(width: 10),
+              const Text("Drink Water!", style: TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Text("It's $time! Time to drink some water and stay hydrated."),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Dismiss"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _addWater(250);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: waterBlue),
+              child: const Text("Log 250ml", style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _reminderTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -431,13 +506,38 @@ class _WaterTabState extends State<WaterTab> {
                     final reminder = _reminders[idx];
                     final time = reminder['reminderTime'] ?? '00:00';
                     final remId = reminder['reminderId'];
+                    final isEnabled = reminder['isEnabled'] ?? true;
                     return ListTile(
                       contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.alarm, color: waterBlue, size: 20),
-                      title: Text(time, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                        onPressed: () => _deleteReminder(remId),
+                      leading: Icon(
+                        isEnabled ? Icons.alarm : Icons.alarm_off,
+                        color: isEnabled ? waterBlue : Colors.grey,
+                        size: 20,
+                      ),
+                      title: Text(
+                        time,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: isEnabled ? const Color(0xFF2D3748) : Colors.grey,
+                          decoration: isEnabled ? null : TextDecoration.lineThrough,
+                        ),
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Switch(
+                            value: isEnabled,
+                            activeTrackColor: waterBlue,
+                            onChanged: (val) async {
+                              await ApiService.saveReminderEnabledState(remId, val);
+                              _loadWaterData();
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                            onPressed: () => _deleteReminder(remId),
+                          ),
+                        ],
                       ),
                     );
                   },
