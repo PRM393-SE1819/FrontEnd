@@ -596,12 +596,36 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
     );
 
     if (confirm == true) {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
       final success = await ApiService.deleteCustomFood(foodId);
+
+      if (mounted) Navigator.pop(context); // Close loading indicator
+
       if (success) {
         _performSearch(_searchController.text);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Custom food deleted successfully")),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Custom food deleted successfully"),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Error: Cannot delete custom food. You may not be the owner of this food item."),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
       }
     }
   }

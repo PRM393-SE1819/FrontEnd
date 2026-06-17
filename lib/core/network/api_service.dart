@@ -64,7 +64,14 @@ class ApiService {
     try {
       final response = await get("/foods?Query=$query&Page=$page&PageSize=$pageSize");
       if (response.statusCode == 200) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final hiddenIds = await getHiddenCustomFoodIds();
+        if (hiddenIds.isNotEmpty && data.containsKey('items') && data['items'] is List) {
+          final items = List<dynamic>.from(data['items']);
+          items.removeWhere((item) => item is Map && hiddenIds.contains(item['foodId']));
+          data['items'] = items;
+        }
+        return data;
       }
     } catch (e) {
       if (kDebugMode) print("Error searching foods: $e");
@@ -123,11 +130,35 @@ class ApiService {
   static Future<bool> deleteCustomFood(int id) async {
     try {
       final response = await delete("/foods/custom/$id");
-      return response.statusCode == 200;
+      if (response.statusCode == 200 || response.statusCode == 204 || response.statusCode == 404) {
+        await hideCustomFoodLocally(id);
+        return true;
+      }
     } catch (e) {
       if (kDebugMode) print("Error deleting custom food: $e");
     }
     return false;
+  }
+
+  static Future<void> hideCustomFoodLocally(int foodId) async {
+    try {
+      final hiddenStr = await _storage.read(key: 'hidden_custom_food_ids') ?? '';
+      final hiddenIds = hiddenStr.split(',').where((s) => s.isNotEmpty).map(int.parse).toSet();
+      hiddenIds.add(foodId);
+      await _storage.write(key: 'hidden_custom_food_ids', value: hiddenIds.join(','));
+    } catch (e) {
+      if (kDebugMode) print("Error hiding custom food locally: $e");
+    }
+  }
+
+  static Future<Set<int>> getHiddenCustomFoodIds() async {
+    try {
+      final hiddenStr = await _storage.read(key: 'hidden_custom_food_ids') ?? '';
+      return hiddenStr.split(',').where((s) => s.isNotEmpty).map(int.parse).toSet();
+    } catch (e) {
+      if (kDebugMode) print("Error getting hidden custom food ids: $e");
+      return {};
+    }
   }
 
   static Future<List<dynamic>?> getFavoriteFoods() async {
@@ -135,12 +166,17 @@ class ApiService {
       final response = await get("/favorite-foods");
       if (response.statusCode == 200) {
         final rawList = jsonDecode(response.body) as List<dynamic>;
-        return rawList.map((item) {
+        final hiddenIds = await getHiddenCustomFoodIds();
+        final mappedList = rawList.map((item) {
           if (item is Map && item.containsKey('food') && item['food'] != null) {
             return item['food'];
           }
           return item;
         }).toList();
+        if (hiddenIds.isNotEmpty) {
+          mappedList.removeWhere((item) => item is Map && hiddenIds.contains(item['foodId']));
+        }
+        return mappedList;
       }
     } catch (e) {
       if (kDebugMode) print("Error getting favorite foods: $e");
@@ -502,6 +538,29 @@ class ApiService {
     return null;
   }
 
+  static Future<bool> deleteWeightLog(int logId) async {
+    try {
+      final response = await delete("/Weight/logs/$logId");
+      return response.statusCode == 200;
+    } catch (e) {
+      if (kDebugMode) print("Error deleting weight log: $e");
+    }
+    return false;
+  }
+
+  // === FOOD BY ID ===
+  static Future<Map<String, dynamic>?> getFoodById(int foodId) async {
+    try {
+      final response = await get("/foods/$foodId");
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+    } catch (e) {
+      if (kDebugMode) print("Error getting food by id: $e");
+    }
+    return null;
+  }
+
   // === HEALTH PROFILE API ===
   static Future<Map<String, dynamic>?> getHealthProfile() async {
     try {
@@ -597,7 +656,150 @@ class ApiService {
     return false;
   }
 
-  // === AI NUTRITION COACH ===
+  static Future<bool> updateAllergy(int allergyId, String allergyName) async {
+    try {
+      final response = await put("/health-profile/allergies/$allergyId", {"allergyName": allergyName});
+      return response.statusCode == 200;
+    } catch (e) {
+      if (kDebugMode) print("Error updating allergy: $e");
+    }
+    return false;
+  }
+
+  static Future<bool> updateHealthCondition(int conditionId, String conditionName, String notes) async {
+    try {
+      final response = await put("/health-profile/conditions/$conditionId", {
+        "conditionName": conditionName,
+        "notes": notes,
+      });
+      return response.statusCode == 200;
+    } catch (e) {
+      if (kDebugMode) print("Error updating condition: $e");
+    }
+    return false;
+  }
+
+  // === AI CALORIE ESTIMATE ===
+  static Future<Map<String, dynamic>?> estimateCalories(String foodDescription) async {
+    try {
+      final token = await getToken();
+      final url = Uri.parse("${ApiConfig.baseUrl}/ai/calorie-estimate");
+      final response = await http.post(
+        url,
+        headers: {
+          "Content-Type": "application/json",
+          if (token != null) "Authorization": "Bearer $token",
+        },
+        body: jsonEncode({"foodDescription": foodDescription}),
+      );
+      if (kDebugMode) print("Calorie Estimate: ${response.statusCode} - ${response.body}");
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+    } catch (e) {
+      if (kDebugMode) print("Error estimating calories: $e");
+    }
+    return null;
+  }
+
+  // === AI CHAT HISTORY ===
+  static Future<Map<String, dynamic>?> getChatHistory({int page = 1, int pageSize = 20}) async {
+    try {
+      final response = await get("/ai/chat/history?page=$page&pageSize=$pageSize");
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+    } catch (e) {
+      if (kDebugMode) print("Error getting chat history: $e");
+    }
+    return null;
+  }
+
+  static Future<bool> deleteChatRecord(int id) async {
+    try {
+      final response = await delete("/ai/chat/history/$id");
+      return response.statusCode == 200;
+    } catch (e) {
+      if (kDebugMode) print("Error deleting chat record: $e");
+    }
+    return false;
+  }
+
+  static Future<bool> deleteAllChatHistory() async {
+    try {
+      final response = await delete("/ai/chat/history");
+      return response.statusCode == 200;
+    } catch (e) {
+      if (kDebugMode) print("Error deleting all chat history: $e");
+    }
+    return false;
+  }
+
+  // === BODY FAT ANALYSIS (Measurement-based — no AI key needed) ===
+  static Future<Map<String, dynamic>?> analyzeBodyFatFromMeasurements({
+    required String gender,
+    required int age,
+    required double height,
+    required double weight,
+    required double waist,
+    required double neck,
+    double? hip,
+  }) async {
+    try {
+      final token = await getToken();
+      final url = Uri.parse("${ApiConfig.baseUrl}/ai/analyze-body-fat");
+      final body = {
+        "gender": gender,
+        "age": age,
+        "height": height,
+        "weight": weight,
+        "waist": waist,
+        "neck": neck,
+        if (hip != null) "hip": hip,
+      };
+      final response = await http.post(
+        url,
+        headers: {
+          "Content-Type": "application/json",
+          if (token != null) "Authorization": "Bearer $token",
+        },
+        body: jsonEncode(body),
+      );
+      if (kDebugMode) print("Body Fat: ${response.statusCode} - ${response.body}");
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+    } catch (e) {
+      if (kDebugMode) print("Error analyzing body fat: $e");
+    }
+    return null;
+  }
+
+  static Future<List<dynamic>?> getBodyFatHistory() async {
+    try {
+      final response = await get("/ai/history");
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is List) return decoded;
+        if (decoded is Map && decoded.containsKey('data')) return decoded['data'] as List;
+      }
+    } catch (e) {
+      if (kDebugMode) print("Error getting body fat history: $e");
+    }
+    return null;
+  }
+
+  static Future<bool> deleteBodyFatHistory(int id) async {
+    try {
+      final response = await delete("/ai/history/$id");
+      return response.statusCode == 200;
+    } catch (e) {
+      if (kDebugMode) print("Error deleting body fat history: $e");
+    }
+    return false;
+  }
+
+
   static const String _openRouterApiKeyDefine = String.fromEnvironment(
     'OPENROUTER_API_KEY',
     defaultValue: '',
@@ -747,6 +949,29 @@ class ApiService {
         
         final rawFoodName = decoded['foodName'] ?? "Món ăn";
         final rawDescription = decoded['description'] ?? "";
+
+        if (rawFoodName.toString().toLowerCase() == 'unknown') {
+          String translatedError = "Không thể phân tích dữ liệu hình ảnh. Vui lòng chụp hoặc chọn ảnh rõ nét hơn và thử lại.";
+          if (rawDescription.isNotEmpty) {
+            final lowerDesc = rawDescription.toString().toLowerCase();
+            if (lowerDesc.contains("could not analyze") || lowerDesc.contains("clearer image") || lowerDesc.contains("ensure the image is clear")) {
+              translatedError = "Không thể phân tích hình ảnh này. Vui lòng đảm bảo hình ảnh chụp món ăn rõ nét và thử lại.";
+            } else {
+              try {
+                final translated = await _translateToVietnamese(rawDescription);
+                if (translated.isNotEmpty && 
+                    !translated.toLowerCase().contains("couldn't process") && 
+                    !translated.toLowerCase().contains("sorry")) {
+                  translatedError = translated;
+                }
+              } catch (_) {}
+            }
+          }
+          return jsonEncode({
+            "success": false,
+            "message": translatedError,
+          });
+        }
 
         // Run translations in parallel for speed!
         final translations = await Future.wait([

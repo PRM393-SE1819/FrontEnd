@@ -94,7 +94,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
     }
   }
 
-  Future<void> _saveRecentScan(String foodName, Map<String, dynamic> fullResult) async {
+  Future<void> _saveRecentScan(String foodName, Map<String, dynamic> fullResult, {String? imageBase64}) async {
     try {
       final nutrition = fullResult['total_nutrition'] ?? {};
       final calories = (nutrition['calories'] as num?)?.toInt() ?? 0;
@@ -124,6 +124,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
         "time": "Hôm nay, ${DateFormat('h:mm a').format(DateTime.now())}",
         "date": DateTime.now().toIso8601String(),
         "imageName": imageName,
+        if (imageBase64 != null) "imageBase64": imageBase64,
         "fullResult": fullResult
       };
 
@@ -260,6 +261,17 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
     final bytes = await image.readAsBytes();
     final base64Data = base64Encode(bytes);
 
+    // Add user's uploaded image to chat immediately
+    setState(() {
+      _messages.add(_ChatMessage(
+        text: "[Hình ảnh món ăn]",
+        isUser: true,
+        timestamp: DateTime.now(),
+        imageBytes: bytes,
+      ));
+    });
+    _scrollToBottom();
+
     _showLoadingDialog("Đang quét món ăn...");
 
     // Send image to OpenRouter vision model
@@ -302,7 +314,10 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
           foodName = items[0]['name_vi'] ?? items[0]['name'] ?? 'Món ăn';
         }
         
-        await _saveRecentScan(foodName, parsedJson);
+        await _saveRecentScan(foodName, parsedJson, imageBase64: base64Data);
+
+        // Inject imageBase64 into parsedJson so the bottom sheet has it
+        parsedJson['imageBase64'] = base64Data;
 
         // Sync scan results to the chat assistant messages
         setState(() {
@@ -313,13 +328,34 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
             foodScanResult: parsedJson,
           ));
         });
+        _scrollToBottom();
 
         _showScanResultBottomSheet(parsedJson);
       } else {
-        _showScanErrorDialog(parsedJson?['message'] ?? "Không thể phân tích dữ liệu hình ảnh.");
+        final errorMsg = parsedJson?['message'] ?? "Không thể phân tích dữ liệu hình ảnh. Vui lòng thử lại với ảnh rõ nét hơn.";
+        setState(() {
+          _messages.add(_ChatMessage(
+            text: errorMsg,
+            isUser: false,
+            timestamp: DateTime.now(),
+            isError: true,
+          ));
+        });
+        _scrollToBottom();
+        _showScanErrorDialog(errorMsg);
       }
     } else {
-      _showScanErrorDialog("Có lỗi kết nối khi phân tích ảnh thức ăn.");
+      const errorMsg = "Có lỗi kết nối khi phân tích ảnh thức ăn.";
+      setState(() {
+        _messages.add(_ChatMessage(
+          text: errorMsg,
+          isUser: false,
+          timestamp: DateTime.now(),
+          isError: true,
+        ));
+      });
+      _scrollToBottom();
+      _showScanErrorDialog(errorMsg);
     }
   }
 
@@ -366,7 +402,13 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
           children: [
             Icon(Icons.error_outline, color: Colors.redAccent),
             SizedBox(width: 8),
-            Text("Không thể nhận diện", style: TextStyle(fontWeight: FontWeight.bold)),
+            Expanded(
+              child: Text(
+                "Không thể nhận diện",
+                style: TextStyle(fontWeight: FontWeight.bold),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
         content: Text(errorMsg),
@@ -778,6 +820,29 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                       ),
                     ],
                   ),
+                  if (res['imageBase64'] != null && res['imageBase64'].toString().isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.memory(
+                        base64Decode(res['imageBase64']),
+                        height: 180,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ] else if (res['imageName'] != null) ...[
+                    const SizedBox(height: 16),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.network(
+                        _getImageUrlForName(res['imageName']),
+                        height: 180,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ],
                   const Divider(height: 30),
 
                   if (totalNutr != null) ...[
@@ -1154,6 +1219,51 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
     }
   }
 
+  Future<void> _estimateCaloriesFromText(String description) async {
+    if (description.trim().isEmpty) return;
+    _showLoadingDialog("Đang ước tính calo...");
+    final res = await ApiService.estimateCalories(description.trim());
+    if (mounted) Navigator.pop(context);
+    if (res != null) {
+      final cal = (res['estimatedCalories'] as num?)?.toInt() ?? 0;
+      final protein = (res['protein'] as num?)?.toDouble() ?? 0.0;
+      final carbs = (res['carbs'] as num?)?.toDouble() ?? 0.0;
+      final fat = (res['fat'] as num?)?.toDouble() ?? 0.0;
+      final food = res['foodName'] ?? description;
+      final advice = res['advice'] ?? '';
+      final scanResult = {
+        'success': true,
+        'message': 'Ước tính: $food',
+        'meal_type': 'lunch',
+        'total_nutrition': {'calories': cal, 'protein': protein, 'carbs': carbs, 'fat': fat, 'fiber': 0.0, 'sodium': 0.0},
+        'items': [
+          {
+            'name_vi': food, 'name_en': food, 'portion_size': '1 phần', 'portion_multiplier': 1.0, 'weight_grams': 100.0,
+            'nutrition': {'calories': cal, 'protein': protein, 'carbs': carbs, 'fat': fat, 'fiber': 0.0, 'sodium': 0.0},
+            'ingredients': [], 'dietary_flags': {'vegetarian': false, 'vegan': false, 'gluten_free': false, 'high_protein': protein >= 20.0},
+          }
+        ],
+        'alternatives': [],
+        'health_rating': 'Tốt',
+        'advice': advice,
+      };
+      await _saveRecentScan(food, scanResult);
+      setState(() {
+        _messages.add(_ChatMessage(
+          text: 'Ước tính: $food — $cal kcal',
+          isUser: false,
+          timestamp: DateTime.now(),
+          foodScanResult: scanResult,
+        ));
+      });
+      _showScanResultBottomSheet(scanResult);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không thể ước tính — vui lòng thử lại.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1221,6 +1331,40 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
               icon: const Icon(Icons.info_outline, color: primaryGreen),
               tooltip: "Dinh dưỡng hôm nay",
               onPressed: _showContextPanel,
+            ),
+          if (_currentSubTab == 1)
+            IconButton(
+              icon: const Icon(Icons.delete_sweep_outlined, color: Colors.redAccent),
+              tooltip: 'Xóa lịch sử chat',
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Xóa lịch sử chat'),
+                    content: const Text('Bạn có chắc muốn xóa toàn bộ lịch sử hội thoại không?'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                        child: const Text('Xóa', style: TextStyle(color: Colors.white)),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true) {
+                  await ApiService.deleteAllChatHistory();
+                  setState(() {
+                    _messages.clear();
+                    _conversationHistory.clear();
+                    _messages.add(_ChatMessage(
+                      text: "Lịch sử đã được xóa. Tôi sẵn sàng hỗ trợ bạn!",
+                      isUser: false,
+                      timestamp: DateTime.now(),
+                    ));
+                  });
+                }
+              },
             ),
         ],
       ),
@@ -1471,6 +1615,69 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
           ),
           const SizedBox(height: 20),
 
+          // ── AI Calorie Estimate (text-based, always works) ──
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Builder(builder: (context) {
+              final estimateCtrl = TextEditingController();
+              return Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [const Color(0xFF0D9488).withOpacity(0.08), Colors.white],
+                    begin: Alignment.topLeft, end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFF0D9488).withOpacity(0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.text_fields, color: Color(0xFF0D9488), size: 20),
+                        SizedBox(width: 8),
+                        Text('Nhập tên món ăn để ước tính',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF2D3748))),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    const Text('Không cần ảnh — nhập mô tả để nhận ước tính calo ngay lập tức.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: estimateCtrl,
+                            decoration: InputDecoration(
+                              hintText: 'Ví dụ: 1 bát phở bò, 2 cuốn chả giò...',
+                              hintStyle: const TextStyle(fontSize: 13),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                            onSubmitted: (val) => _estimateCaloriesFromText(val),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        ElevatedButton(
+                          onPressed: () => _estimateCaloriesFromText(estimateCtrl.text),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0D9488),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                          ),
+                          child: const Icon(Icons.calculate, color: Colors.white, size: 20),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 20),
+
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Container(
@@ -1517,11 +1724,12 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                   const Divider(height: 1),
                   const SizedBox(height: 12),
                   const Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        "Accuracy",
-                        style: TextStyle(fontSize: 13, color: Colors.grey),
+                      Expanded(
+                        child: Text(
+                          "Accuracy",
+                          style: TextStyle(fontSize: 13, color: Colors.grey),
+                        ),
                       ),
                       Text(
                         "~94%",
@@ -1537,6 +1745,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
               ),
             ),
           ),
+
           const SizedBox(height: 24),
 
           const Padding(
@@ -1597,11 +1806,16 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
 
                       final calories = scan['calories'] ?? 0;
                       final imageUrl = _getImageUrlForName(scan['imageName'] ?? 'fallback');
+                      final base64Image = scan['imageBase64'] as String?;
 
-                      return GestureDetector(
+                       return GestureDetector(
                         onTap: () {
                           if (scan['fullResult'] != null) {
-                            _showScanResultBottomSheet(scan['fullResult']);
+                            final fullResult = Map<String, dynamic>.from(scan['fullResult']);
+                            if (scan['imageBase64'] != null) {
+                              fullResult['imageBase64'] = scan['imageBase64'];
+                            }
+                            _showScanResultBottomSheet(fullResult);
                           }
                         },
                         child: Container(
@@ -1622,33 +1836,49 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                             borderRadius: BorderRadius.circular(20),
                             child: Stack(
                               children: [
-                                Image.network(
-                                  imageUrl,
-                                  height: double.infinity,
-                                  width: double.infinity,
-                                  fit: BoxFit.cover,
-                                  loadingBuilder: (context, child, loadingProgress) {
-                                    if (loadingProgress == null) return child;
-                                    return Container(
-                                      color: Colors.grey[100],
-                                      child: const Center(
-                                        child: SizedBox(
-                                          width: 20,
-                                          height: 20,
-                                          child: CircularProgressIndicator(strokeWidth: 2, color: primaryGreen),
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  errorBuilder: (context, error, stackTrace) => Container(
-                                    color: Colors.grey[200],
-                                    width: double.infinity,
+                                if (base64Image != null && base64Image.isNotEmpty)
+                                  Image.memory(
+                                    base64Decode(base64Image),
                                     height: double.infinity,
-                                    child: const Center(
-                                      child: Icon(Icons.restaurant, color: Colors.grey, size: 40),
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) => Container(
+                                      color: Colors.grey[200],
+                                      width: double.infinity,
+                                      height: double.infinity,
+                                      child: const Center(
+                                        child: Icon(Icons.restaurant, color: Colors.grey, size: 40),
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  Image.network(
+                                    imageUrl,
+                                    height: double.infinity,
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
+                                    loadingBuilder: (context, child, loadingProgress) {
+                                      if (loadingProgress == null) return child;
+                                      return Container(
+                                        color: Colors.grey[100],
+                                        child: const Center(
+                                          child: SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(strokeWidth: 2, color: primaryGreen),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    errorBuilder: (context, error, stackTrace) => Container(
+                                      color: Colors.grey[200],
+                                      width: double.infinity,
+                                      height: double.infinity,
+                                      child: const Center(
+                                        child: Icon(Icons.restaurant, color: Colors.grey, size: 40),
+                                      ),
                                     ),
                                   ),
-                                ),
                                 Container(
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
@@ -1751,7 +1981,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isNarrow = constraints.maxWidth < 420;
+        final isNarrow = constraints.maxWidth < 540;
 
         if (isNarrow) {
           return Container(
@@ -1763,10 +1993,12 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.local_fire_department, color: Colors.orange[700], size: 16),
                         const SizedBox(width: 4),

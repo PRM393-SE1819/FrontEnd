@@ -522,22 +522,25 @@ class _WaterTabState extends State<WaterTab> {
                           decoration: isEnabled ? null : TextDecoration.lineThrough,
                         ),
                       ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Switch(
-                            value: isEnabled,
-                            activeTrackColor: waterBlue,
-                            onChanged: (val) async {
-                              await ApiService.saveReminderEnabledState(remId, val);
-                              _loadWaterData();
-                            },
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                            onPressed: () => _deleteReminder(remId),
-                          ),
-                        ],
+                      trailing: SizedBox(
+                        width: 110,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Switch(
+                              value: isEnabled,
+                              activeTrackColor: waterBlue,
+                              onChanged: (val) async {
+                                await ApiService.saveReminderEnabledState(remId, val);
+                                _loadWaterData();
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                              onPressed: () => _deleteReminder(remId),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },

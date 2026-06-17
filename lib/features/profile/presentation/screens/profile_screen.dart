@@ -278,86 +278,93 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _openAddAllergyDialog() {
-    final nameController = TextEditingController();
-    final notesController = TextEditingController();
+  void _openAddAllergyDialog({Map<String, dynamic>? existing}) {
+    final nameController = TextEditingController(text: existing?['allergyName'] ?? '');
+    final notesController = TextEditingController(text: existing?['notes'] ?? '');
+    final isEdit = existing != null;
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("Add Food Allergy"),
+        title: Text(isEdit ? 'Edit Food Allergy' : 'Add Food Allergy'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: nameController,
-              decoration: const InputDecoration(labelText: "Allergy Name *"),
+              decoration: const InputDecoration(labelText: 'Allergy Name *'),
             ),
             TextField(
               controller: notesController,
-              decoration: const InputDecoration(labelText: "Reaction Notes"),
+              decoration: const InputDecoration(labelText: 'Reaction Notes'),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
               final name = nameController.text.trim();
               if (name.isEmpty) return;
-              
               Navigator.pop(context);
-              final success = await ApiService.addAllergy(name, notesController.text.trim());
-              if (success) {
-                _loadProfileData();
+              bool success;
+              if (isEdit) {
+                success = await ApiService.updateAllergy(existing!['allergyId'], name);
+              } else {
+                success = await ApiService.addAllergy(name, notesController.text.trim());
               }
+              if (success) _loadProfileData();
             },
             style: ElevatedButton.styleFrom(backgroundColor: primaryGreen),
-            child: const Text("Add", style: TextStyle(color: Colors.white)),
+            child: Text(isEdit ? 'Update' : 'Add', style: const TextStyle(color: Colors.white)),
           )
         ],
       ),
     );
   }
 
-  void _openAddConditionDialog() {
-    final nameController = TextEditingController();
-    final notesController = TextEditingController();
+  void _openAddConditionDialog({Map<String, dynamic>? existing}) {
+    final nameController = TextEditingController(text: existing?['conditionName'] ?? '');
+    final notesController = TextEditingController(text: existing?['notes'] ?? '');
+    final isEdit = existing != null;
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("Add Health Condition"),
+        title: Text(isEdit ? 'Edit Health Condition' : 'Add Health Condition'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: nameController,
-              decoration: const InputDecoration(labelText: "Condition Name *"),
+              decoration: const InputDecoration(labelText: 'Condition Name *'),
             ),
             TextField(
               controller: notesController,
-              decoration: const InputDecoration(labelText: "Severity/Notes"),
+              decoration: const InputDecoration(labelText: 'Severity/Notes'),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
               final name = nameController.text.trim();
               if (name.isEmpty) return;
-              
               Navigator.pop(context);
-              final success = await ApiService.addHealthCondition(name, notesController.text.trim());
-              if (success) {
-                _loadProfileData();
+              bool success;
+              if (isEdit) {
+                success = await ApiService.updateHealthCondition(
+                    existing!['healthConditionId'], name, notesController.text.trim());
+              } else {
+                success = await ApiService.addHealthCondition(name, notesController.text.trim());
               }
+              if (success) _loadProfileData();
             },
             style: ElevatedButton.styleFrom(backgroundColor: primaryGreen),
-            child: const Text("Add", style: TextStyle(color: Colors.white)),
+            child: Text(isEdit ? 'Update' : 'Add', style: const TextStyle(color: Colors.white)),
           )
         ],
       ),
@@ -536,8 +543,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text("Food Allergies", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              IconButton(icon: Icon(Icons.add, color: primaryGreen), onPressed: _openAddAllergyDialog),
+              const Text('Food Allergies', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              IconButton(icon: Icon(Icons.add, color: primaryGreen), onPressed: () => _openAddAllergyDialog()),
             ],
           ),
           const SizedBox(height: 10),
@@ -555,12 +562,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       leading: const Icon(Icons.warning_amber_rounded, color: Colors.orange),
                       title: Text(item['allergyName'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
                       subtitle: Text(item['notes'] ?? 'No reaction details'),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                        onPressed: () async {
-                          final success = await ApiService.deleteAllergy(allergyId);
-                          if (success) _loadProfileData();
-                        },
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: Icon(Icons.edit_outlined, color: primaryGreen, size: 20),
+                            onPressed: () => _openAddAllergyDialog(existing: item),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                            onPressed: () async {
+                              final success = await ApiService.deleteAllergy(allergyId);
+                              if (success) _loadProfileData();
+                            },
+                          ),
+                        ],
                       ),
                     );
                   },
@@ -586,8 +602,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text("Health Conditions", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              IconButton(icon: Icon(Icons.add, color: primaryGreen), onPressed: _openAddConditionDialog),
+              const Text('Health Conditions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              IconButton(icon: Icon(Icons.add, color: primaryGreen), onPressed: () => _openAddConditionDialog()),
             ],
           ),
           const SizedBox(height: 10),
@@ -605,12 +621,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       leading: const Icon(Icons.favorite_border, color: Colors.redAccent),
                       title: Text(item['conditionName'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
                       subtitle: Text(item['notes'] ?? 'No notes'),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                        onPressed: () async {
-                          final success = await ApiService.deleteHealthCondition(conditionId);
-                          if (success) _loadProfileData();
-                        },
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: Icon(Icons.edit_outlined, color: primaryGreen, size: 20),
+                            onPressed: () => _openAddConditionDialog(existing: item),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                            onPressed: () async {
+                              final success = await ApiService.deleteHealthCondition(conditionId);
+                              if (success) _loadProfileData();
+                            },
+                          ),
+                        ],
                       ),
                     );
                   },

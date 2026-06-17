@@ -138,14 +138,39 @@ class _MealTabState extends State<MealTab> {
             void searchAndAddFood() {
               final searchController = TextEditingController();
               List<dynamic> foodResults = [];
-              bool searchingFood = false;
+              bool searchingFood = true;
+              bool initiated = false;
 
               showDialog(
                 context: context,
                 builder: (context) {
                   return StatefulBuilder(
                     builder: (context, setSearchState) {
+                      if (!initiated) {
+                        initiated = true;
+                        Future.microtask(() async {
+                          final results = await ApiService.searchFoods("");
+                          final favs = await ApiService.getFavoriteFoods() ?? [];
+                          setSearchState(() {
+                            final List<dynamic> loaded = results != null ? results['items'] ?? [] : [];
+                            final favIds = favs.map((f) => f['foodId']).toSet();
+                            for (var f in loaded) {
+                              f['isFavorite'] = favIds.contains(f['foodId']);
+                            }
+                            // Sort favorites to the top
+                            loaded.sort((a, b) {
+                              final aFav = a['isFavorite'] == true ? 1 : 0;
+                              final bFav = b['isFavorite'] == true ? 1 : 0;
+                              return bFav.compareTo(aFav);
+                            });
+                            foodResults = loaded;
+                            searchingFood = false;
+                          });
+                        });
+                      }
+
                       return AlertDialog(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                         title: const Text("Search Food to Add"),
                         content: SizedBox(
                           width: double.maxFinite,
@@ -161,8 +186,14 @@ class _MealTabState extends State<MealTab> {
                                     onPressed: () async {
                                       setSearchState(() => searchingFood = true);
                                       final results = await ApiService.searchFoods(searchController.text.trim());
+                                      final favs = await ApiService.getFavoriteFoods() ?? [];
                                       setSearchState(() {
-                                        foodResults = results != null ? results['items'] ?? [] : [];
+                                        final List<dynamic> loaded = results != null ? results['items'] ?? [] : [];
+                                        final favIds = favs.map((f) => f['foodId']).toSet();
+                                        for (var f in loaded) {
+                                          f['isFavorite'] = favIds.contains(f['foodId']);
+                                        }
+                                        foodResults = loaded;
                                         searchingFood = false;
                                       });
                                     },
@@ -171,8 +202,14 @@ class _MealTabState extends State<MealTab> {
                                 onSubmitted: (val) async {
                                   setSearchState(() => searchingFood = true);
                                   final results = await ApiService.searchFoods(val.trim());
+                                  final favs = await ApiService.getFavoriteFoods() ?? [];
                                   setSearchState(() {
-                                    foodResults = results != null ? results['items'] ?? [] : [];
+                                    final List<dynamic> loaded = results != null ? results['items'] ?? [] : [];
+                                    final favIds = favs.map((f) => f['foodId']).toSet();
+                                    for (var f in loaded) {
+                                      f['isFavorite'] = favIds.contains(f['foodId']);
+                                    }
+                                    foodResults = loaded;
                                     searchingFood = false;
                                   });
                                 },
@@ -183,14 +220,46 @@ class _MealTabState extends State<MealTab> {
                                   : SizedBox(
                                       height: 250,
                                       child: foodResults.isEmpty
-                                          ? Center(child: Text("Search foods above", style: TextStyle(color: Colors.grey[400])))
+                                          ? Center(child: Text("Không tìm thấy món ăn nào", style: TextStyle(color: Colors.grey[400])))
                                           : ListView.builder(
                                               itemCount: foodResults.length,
                                               itemBuilder: (context, idx) {
                                                 final food = foodResults[idx];
+                                                final isFav = food['isFavorite'] == true;
+                                                final isCustom = food['isCustom'] == true || food['foodType'] == 'Custom';
                                                 return ListTile(
-                                                  title: Text(food['name'] ?? ''),
-                                                  subtitle: Text("${food['calories']} kcal / ${food['servingSize'] ?? '100g'}"),
+                                                  title: Row(
+                                                    children: [
+                                                      Expanded(
+                                                        child: Text(
+                                                          food['name'] ?? '',
+                                                          style: const TextStyle(fontWeight: FontWeight.bold),
+                                                        ),
+                                                      ),
+                                                      if (isFav)
+                                                        const Icon(Icons.star, color: Colors.amber, size: 18),
+                                                    ],
+                                                  ),
+                                                  subtitle: Wrap(
+                                                    crossAxisAlignment: WrapCrossAlignment.center,
+                                                    spacing: 6,
+                                                    children: [
+                                                      Text("${food['calories']} kcal / ${food['servingSize'] ?? '100g'}"),
+                                                      if (isCustom)
+                                                        Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                                          decoration: BoxDecoration(
+                                                            color: Colors.teal.shade50,
+                                                            borderRadius: BorderRadius.circular(4),
+                                                            border: Border.all(color: Colors.teal.shade200, width: 0.5),
+                                                          ),
+                                                          child: Text(
+                                                            "Tự tạo",
+                                                            style: TextStyle(fontSize: 10, color: Colors.teal.shade700, fontWeight: FontWeight.bold),
+                                                          ),
+                                                        ),
+                                                    ],
+                                                  ),
                                                   trailing: const Icon(Icons.add_circle_outline, color: Colors.green),
                                                   onTap: () {
                                                     Navigator.pop(context, food);
