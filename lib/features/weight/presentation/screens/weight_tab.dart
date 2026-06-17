@@ -3,8 +3,6 @@ import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../../core/network/api_service.dart';
 
-
-
 class WeightTab extends StatefulWidget {
   const WeightTab({super.key});
 
@@ -93,14 +91,14 @@ class _WeightTabState extends State<WeightTab> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(editLog == null ? "Log Weight & Body Fat" : "Update Weight Log"),
+        title: Text(editLog == null ? "Ghi nhận Cân nặng & Lượng mỡ" : "Cập nhật lượt ghi nhận"),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: weightController,
               decoration: const InputDecoration(
-                labelText: "Weight (kg)",
+                labelText: "Cân nặng (kg) *",
                 suffixText: "kg",
               ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -109,7 +107,7 @@ class _WeightTabState extends State<WeightTab> {
             TextField(
               controller: fatController,
               decoration: const InputDecoration(
-                labelText: "Body Fat (%) (Optional)",
+                labelText: "Tỉ lệ mỡ cơ thể (%) (Tùy chọn)",
                 suffixText: "%",
               ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -117,7 +115,7 @@ class _WeightTabState extends State<WeightTab> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Hủy", style: TextStyle(color: Colors.grey))),
           ElevatedButton(
             onPressed: () async {
               final w = double.tryParse(weightController.text) ?? 70.0;
@@ -143,14 +141,14 @@ class _WeightTabState extends State<WeightTab> {
                 _loadWeightData();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(editLog == null ? "Weight logged successfully!" : "Log updated successfully!"),
+                    content: Text(editLog == null ? "Đã ghi nhận cân nặng thành công!" : "Đã cập nhật thành công!"),
                     backgroundColor: primaryGreen,
                   ),
                 );
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: primaryGreen),
-            child: const Text("Save", style: TextStyle(color: Colors.white)),
+            child: const Text("Lưu", style: TextStyle(color: Colors.white)),
           )
         ],
       ),
@@ -164,14 +162,13 @@ class _WeightTabState extends State<WeightTab> {
     bool isCalculating = false;
     Map<String, dynamic>? result;
 
-    // Get gender/age/height/weight from current profile if available
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setS) => AlertDialog(
           scrollable: true,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Body Fat Calculator', style: TextStyle(fontWeight: FontWeight.bold)),
+          title: const Text('Công cụ tính Tỷ lệ mỡ', style: TextStyle(fontWeight: FontWeight.bold)),
           content: SizedBox(
             width: 340,
             child: result != null
@@ -181,14 +178,14 @@ class _WeightTabState extends State<WeightTab> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Enter your body measurements (cm) to estimate body fat % using the US Navy formula.',
+                        'Nhập số đo cơ thể (cm) để ước tính tỷ lệ mỡ theo công thức US Navy (Hải quân Hoa Kỳ).',
                         style: TextStyle(fontSize: 13, color: Colors.grey),
                       ),
                       const SizedBox(height: 16),
                       TextField(
                         controller: waistCtrl,
                         decoration: const InputDecoration(
-                          labelText: 'Waist circumference (cm) *',
+                          labelText: 'Số đo vòng eo (cm) *',
                           suffixText: 'cm',
                           border: OutlineInputBorder(),
                         ),
@@ -198,7 +195,7 @@ class _WeightTabState extends State<WeightTab> {
                       TextField(
                         controller: neckCtrl,
                         decoration: const InputDecoration(
-                          labelText: 'Neck circumference (cm) *',
+                          labelText: 'Số đo vòng cổ (cm) *',
                           suffixText: 'cm',
                           border: OutlineInputBorder(),
                         ),
@@ -208,7 +205,7 @@ class _WeightTabState extends State<WeightTab> {
                       TextField(
                         controller: hipCtrl,
                         decoration: const InputDecoration(
-                          labelText: 'Hip circumference (cm) — female only',
+                          labelText: 'Số đo vòng hông (cm) — Chỉ dành cho Nữ',
                           suffixText: 'cm',
                           border: OutlineInputBorder(),
                         ),
@@ -226,11 +223,11 @@ class _WeightTabState extends State<WeightTab> {
                       Navigator.pop(context);
                       _loadWeightData();
                     },
-                    child: const Text('Done'),
+                    child: const Text('Hoàn thành'),
                   )
                 ]
               : [
-                  TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                  TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy', style: TextStyle(color: Colors.grey))),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(backgroundColor: tealAccent),
                     onPressed: isCalculating
@@ -240,14 +237,14 @@ class _WeightTabState extends State<WeightTab> {
                             final neck = double.tryParse(neckCtrl.text);
                             if (waist == null || neck == null) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Please enter waist and neck measurements')),
+                                const SnackBar(content: Text('Vui lòng nhập vòng eo và vòng cổ')),
                               );
                               return;
                             }
                             setS(() => isCalculating = true);
                             final hip = double.tryParse(hipCtrl.text);
                             final res = await ApiService.analyzeBodyFatFromMeasurements(
-                              gender: 'Male', // default; user can set in profile
+                              gender: 'Male', // default
                               age: 25,
                               height: 170,
                               weight: _currentWeight ?? 70,
@@ -260,10 +257,10 @@ class _WeightTabState extends State<WeightTab> {
                               result = res;
                             });
                           },
-                    child: const Text('Calculate', style: TextStyle(color: Colors.white)),
+                    child: const Text('Tính toán', style: TextStyle(color: Colors.white)),
                   ),
                 ],
-        ),
+          ),
       ),
     );
   }
@@ -296,9 +293,9 @@ class _WeightTabState extends State<WeightTab> {
         ),
         const SizedBox(height: 16),
         if (assessment.isNotEmpty) ...
-            [Text('Health: $assessment', style: const TextStyle(fontSize: 13)), const SizedBox(height: 8)],
+            [Text('Sức khỏe: $assessment', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)), const SizedBox(height: 8)],
         if (recommendation.isNotEmpty)
-          Text('Tip: $recommendation', style: const TextStyle(fontSize: 13, color: Colors.grey)),
+          Text('Lời khuyên: $recommendation', style: const TextStyle(fontSize: 13, color: Colors.grey)),
       ],
     );
   }
@@ -309,7 +306,7 @@ class _WeightTabState extends State<WeightTab> {
       backgroundColor: const Color(0xFFF7FAFC),
       appBar: AppBar(
         title: const Text(
-          "Weight & Body Fat Tracker",
+          "Theo dõi Cân nặng & Lượng mỡ",
           style: TextStyle(color: Color(0xFF2D3748), fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white,
@@ -321,15 +318,30 @@ class _WeightTabState extends State<WeightTab> {
               padding: const EdgeInsets.all(20.0),
               child: Column(
                 children: [
-                  _buildSummaryGrid(),
+                  AnimatedFadeSlide(
+                    delay: 0,
+                    child: _buildSummaryGrid(),
+                  ),
                   const SizedBox(height: 25),
-                  _buildChartCard(),
+                  AnimatedFadeSlide(
+                    delay: 100,
+                    child: _buildChartCard(),
+                  ),
                   const SizedBox(height: 25),
-                  _buildBodyFatCalculatorBanner(),
+                  AnimatedFadeSlide(
+                    delay: 150,
+                    child: _buildBodyFatCalculatorBanner(),
+                  ),
                   const SizedBox(height: 25),
-                  _buildBodyFatHistorySection(),
+                  AnimatedFadeSlide(
+                    delay: 200,
+                    child: _buildBodyFatHistorySection(),
+                  ),
                   const SizedBox(height: 25),
-                  _buildLogHistorySection(),
+                  AnimatedFadeSlide(
+                    delay: 250,
+                    child: _buildLogHistorySection(),
+                  ),
                 ],
               ),
             ),
@@ -358,14 +370,14 @@ class _WeightTabState extends State<WeightTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Weight progress", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Text("Tiến trình cân nặng", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 15),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _summaryMetric("Start", _startWeight != null ? "${_startWeight!.toStringAsFixed(1)} kg" : "-- kg"),
-                  _summaryMetric("Current", _currentWeight != null ? "${_currentWeight!.toStringAsFixed(1)} kg" : "-- kg"),
-                  _summaryMetric("Target", _targetWeight != null ? "${_targetWeight!.toStringAsFixed(1)} kg" : "-- kg"),
+                  _summaryMetric("Bắt đầu", _startWeight != null ? "${_startWeight!.toStringAsFixed(1)} kg" : "-- kg"),
+                  _summaryMetric("Hiện tại", _currentWeight != null ? "${_currentWeight!.toStringAsFixed(1)} kg" : "-- kg"),
+                  _summaryMetric("Mục tiêu", _targetWeight != null ? "${_targetWeight!.toStringAsFixed(1)} kg" : "-- kg"),
                 ],
               ),
               const Divider(height: 30),
@@ -373,7 +385,7 @@ class _WeightTabState extends State<WeightTab> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    "Total Weight Change:",
+                    "Thay đổi cân nặng:",
                     style: TextStyle(color: Colors.grey[700], fontSize: 14),
                   ),
                   Text(
@@ -407,13 +419,13 @@ class _WeightTabState extends State<WeightTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Body Fat progress", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Text("Tiến trình mỡ cơ thể", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 15),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _summaryMetric("Start Fat", _startBodyFat != null ? "${_startBodyFat!.toStringAsFixed(1)}%" : "--%"),
-                  _summaryMetric("Current Fat", _currentBodyFat != null ? "${_currentBodyFat!.toStringAsFixed(1)}%" : "--%"),
+                  _summaryMetric("Mỡ bắt đầu", _startBodyFat != null ? "${_startBodyFat!.toStringAsFixed(1)}%" : "--%"),
+                  _summaryMetric("Mỡ hiện tại", _currentBodyFat != null ? "${_currentBodyFat!.toStringAsFixed(1)}%" : "--%"),
                 ],
               ),
               const Divider(height: 30),
@@ -421,7 +433,7 @@ class _WeightTabState extends State<WeightTab> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    "Total Body Fat Change:",
+                    "Thay đổi mỡ cơ thể:",
                     style: TextStyle(color: Colors.grey[700], fontSize: 14),
                   ),
                   Text(
@@ -469,14 +481,14 @@ class _WeightTabState extends State<WeightTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("30-Day Trend", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const Text("Xu hướng 30 ngày qua", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 20),
           _chartHistory.isEmpty || _chartHistory.length < 2
               ? Container(
                   height: 180,
                   alignment: Alignment.center,
                   child: Text(
-                    "Need at least 2 logs to display trend chart.",
+                    "Cần ít nhất 2 lượt ghi nhận để hiển thị biểu đồ xu hướng.",
                     style: TextStyle(color: Colors.grey[400]),
                   ),
                 )
@@ -543,10 +555,10 @@ class _WeightTabState extends State<WeightTab> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Body Fat Calculator',
+                  Text('Công cụ tính Tỷ lệ mỡ cơ thể',
                       style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                   SizedBox(height: 4),
-                  Text('US Navy formula — enter measurements, no photo needed',
+                  Text('Công thức US Navy — nhập số đo, không cần chụp ảnh',
                       style: TextStyle(color: Colors.white70, fontSize: 12)),
                 ],
               ),
@@ -563,7 +575,7 @@ class _WeightTabState extends State<WeightTab> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Body Fat Analysis History',
+        const Text('Lịch sử phân tích mỡ cơ thể',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 12),
         ListView.builder(
@@ -575,26 +587,29 @@ class _WeightTabState extends State<WeightTab> {
             final bf = (rec['estimatedBodyFat'] as num?)?.toDouble() ?? 0.0;
             final category = rec['category'] ?? '';
             final createdAt = rec['createdAt'] != null
-                ? DateFormat('MMM dd, yyyy').format(DateTime.parse(rec['createdAt']).toLocal())
+                ? DateFormat('dd/MM/yyyy').format(DateTime.parse(rec['createdAt']).toLocal())
                 : '';
-            return Card(
-              elevation: 0,
-              margin: const EdgeInsets.only(bottom: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: tealAccent.withOpacity(0.1),
-                  child: Text('${bf.round()}%',
-                      style: TextStyle(color: tealAccent, fontWeight: FontWeight.bold, fontSize: 12)),
-                ),
-                title: Text('${bf.toStringAsFixed(1)}% — $category'),
-                subtitle: Text(createdAt),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                  onPressed: () async {
-                    final success = await ApiService.deleteBodyFatHistory(rec['id']);
-                    if (success) _loadWeightData();
-                  },
+            return AnimatedFadeSlide(
+              delay: (idx * 50).clamp(0, 300),
+              child: Card(
+                elevation: 0,
+                margin: const EdgeInsets.only(bottom: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: tealAccent.withOpacity(0.1),
+                    child: Text('${bf.round()}%',
+                        style: TextStyle(color: tealAccent, fontWeight: FontWeight.bold, fontSize: 12)),
+                  ),
+                  title: Text('${bf.toStringAsFixed(1)}% — $category'),
+                  subtitle: Text(createdAt),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                    onPressed: () async {
+                      final success = await ApiService.deleteBodyFatHistory(rec['id']);
+                      if (success) _loadWeightData();
+                    },
+                  ),
                 ),
               ),
             );
@@ -608,7 +623,7 @@ class _WeightTabState extends State<WeightTab> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Weight Log History', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const Text('Lịch sử ghi nhận cân nặng', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 12),
         _logs.isEmpty
             ? Container(
@@ -616,7 +631,7 @@ class _WeightTabState extends State<WeightTab> {
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
                 child: Center(
-                  child: Text('No weight logged yet.', style: TextStyle(color: Colors.grey[400])),
+                  child: Text('Chưa có cân nặng nào được ghi nhận.', style: TextStyle(color: Colors.grey[400])),
                 ),
               )
             : ListView.builder(
@@ -626,73 +641,106 @@ class _WeightTabState extends State<WeightTab> {
                 itemBuilder: (context, idx) {
                   final log = _logs[idx];
                   final logTime = DateTime.parse(log['loggedAt']).toLocal();
-                  final dateStr = DateFormat('MMM dd, yyyy').format(logTime);
+                  final dateStr = DateFormat('dd/MM/yyyy').format(logTime);
                   final weight = (log['weight'] as num?)?.toDouble() ?? 0.0;
                   final bodyFat = (log['bodyFat'] as num?)?.toDouble();
 
-                  return Card(
-                    elevation: 0,
-                    margin: const EdgeInsets.only(bottom: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: primaryGreen.withOpacity(0.1),
-                        child: Icon(Icons.monitor_weight_outlined, color: primaryGreen, size: 20),
-                      ),
-                      title: Text('${weight.toStringAsFixed(1)} kg',
-                          style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text(dateStr),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (bodyFat != null)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: tealAccent.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text('${bodyFat.toStringAsFixed(1)}%',
-                                  style: TextStyle(
-                                      color: tealAccent, fontWeight: FontWeight.bold, fontSize: 12)),
-                            ),
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined, color: Colors.grey, size: 20),
-                            onPressed: () => _openLogWeightDialog(editLog: log),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
-                            onPressed: () async {
-                              final confirm = await showDialog<bool>(
-                                context: context,
-                                builder: (ctx) => AlertDialog(
-                                  title: const Text('Delete Log'),
-                                  content: const Text('Remove this weight log?'),
-                                  actions: [
-                                    TextButton(
-                                        onPressed: () => Navigator.pop(ctx, false),
-                                        child: const Text('Cancel')),
-                                    ElevatedButton(
-                                      onPressed: () => Navigator.pop(ctx, true),
-                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-                                      child: const Text('Delete', style: TextStyle(color: Colors.white)),
-                                    ),
-                                  ],
+                  return AnimatedFadeSlide(
+                    delay: (idx * 50).clamp(0, 300),
+                    child: Card(
+                      elevation: 0,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: primaryGreen.withOpacity(0.1),
+                          child: Icon(Icons.monitor_weight_outlined, color: primaryGreen, size: 20),
+                        ),
+                        title: Text('${weight.toStringAsFixed(1)} kg',
+                            style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(dateStr),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (bodyFat != null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: tealAccent.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
-                              );
-                              if (confirm == true) {
-                                final success = await ApiService.deleteWeightLog(log['weightLogId']);
-                                if (success) _loadWeightData();
-                              }
-                            },
-                          ),
-                        ],
+                                child: Text('${bodyFat.toStringAsFixed(1)}%',
+                                    style: TextStyle(
+                                        color: tealAccent, fontWeight: FontWeight.bold, fontSize: 12)),
+                              ),
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined, color: Colors.grey, size: 20),
+                              onPressed: () => _openLogWeightDialog(editLog: log),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                              onPressed: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('Xóa nhật ký'),
+                                    content: const Text('Bạn có chắc muốn xóa lượt ghi nhận cân nặng này?'),
+                                    actions: [
+                                      TextButton(
+                                          onPressed: () => Navigator.pop(ctx, false),
+                                          child: const Text('Hủy', style: TextStyle(color: Colors.grey))),
+                                      ElevatedButton(
+                                        onPressed: () => Navigator.pop(ctx, true),
+                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                                        child: const Text('Xóa', style: TextStyle(color: Colors.white)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirm == true) {
+                                  final success = await ApiService.deleteWeightLog(log['weightLogId']);
+                                  if (success) _loadWeightData();
+                                }
+                              },
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   );
                 },
               ),
       ],
+    );
+  }
+}
+
+class AnimatedFadeSlide extends StatelessWidget {
+  final Widget child;
+  final int delay;
+
+  const AnimatedFadeSlide({
+    super.key,
+    required this.child,
+    required this.delay,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 400 + delay),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, (1.0 - value) * 15),
+            child: child,
+          ),
+        );
+      },
+      child: child,
     );
   }
 }

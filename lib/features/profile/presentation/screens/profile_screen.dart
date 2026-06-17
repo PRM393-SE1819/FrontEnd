@@ -17,7 +17,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _profileExists = false;
 
   // Profile data
-  String _fullName = "User";
+  String _fullName = "Người dùng";
   String _email = "";
   String _gender = "Male";
   DateTime _dob = DateTime.now().subtract(const Duration(days: 365 * 25));
@@ -37,6 +37,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final Color primaryGreen = const Color(0xFF006D44);
   final Color bgColor = const Color(0xFFF7FAFC);
 
+  final Map<String, String> genderLabelMap = {
+    'Male': 'Nam',
+    'Female': 'Nữ',
+  };
+
+  final Map<String, String> activityLabelMap = {
+    'Sedentary': 'Ít vận động (Văn phòng)',
+    'LightlyActive': 'Vận động nhẹ (1-3 ngày/tuần)',
+    'ModeratelyActive': 'Vận động vừa (3-5 ngày/tuần)',
+    'VeryActive': 'Vận động nhiều (6-7 ngày/tuần)',
+    'ExtraActive': 'Vận động rất nhiều (Vận động viên)',
+  };
+
+  final Map<String, String> goalLabelMap = {
+    'LoseWeight': 'Giảm cân',
+    'MaintainWeight': 'Giữ cân',
+    'GainWeight': 'Tăng cân',
+  };
+
   @override
   void initState() {
     super.initState();
@@ -46,7 +65,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _loadProfileData({bool showLoader = true}) async {
     if (showLoader) setState(() => _isLoading = true);
     try {
-      // Run all 3 API calls in parallel instead of sequential
       final results = await Future.wait([
         ApiService.getHealthProfile(),
         ApiService.getAllergies(),
@@ -78,7 +96,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _allergies = allergiesList ?? [];
       _conditions = conditionsList ?? [];
 
-      // Also store username so nav bar is always in sync
       if (_fullName.isNotEmpty) {
         await _storage.write(key: 'user_name', value: _fullName);
       }
@@ -122,59 +139,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
             return AlertDialog(
               scrollable: true,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: Text(_profileExists ? "Update Health Profile" : "Initialize Profile"),
+              title: Text(_profileExists ? "Cập nhật Hồ sơ Sức khỏe" : "Khởi tạo Hồ sơ"),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   DropdownButtonFormField<String>(
                     value: editGender,
-                    decoration: const InputDecoration(labelText: "Gender"),
-                    items: genderOptions.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                    decoration: const InputDecoration(labelText: "Giới tính"),
+                    items: genderOptions.map((g) => DropdownMenuItem(value: g, child: Text(genderLabelMap[g] ?? g))).toList(),
                     onChanged: (val) => setDialogState(() => editGender = val!),
                   ),
                   const SizedBox(height: 12),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: Text("Date of Birth: ${DateFormat('yyyy-MM-dd').format(editDob)}"),
+                    title: Text("Ngày sinh: ${DateFormat('dd/MM/yyyy').format(editDob)}"),
                     trailing: const Icon(Icons.calendar_today),
                     onTap: selectDob,
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: heightController,
-                    decoration: const InputDecoration(labelText: "Height (cm)", suffixText: "cm"),
+                    decoration: const InputDecoration(labelText: "Chiều cao (cm)", suffixText: "cm"),
                     keyboardType: TextInputType.number,
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: weightController,
-                    decoration: const InputDecoration(labelText: "Weight (kg)", suffixText: "kg"),
+                    decoration: const InputDecoration(labelText: "Cân nặng (kg)", suffixText: "kg"),
                     keyboardType: TextInputType.number,
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     value: editActivity,
-                    decoration: const InputDecoration(labelText: "Activity Level"),
-                    items: activityOptions.map((a) => DropdownMenuItem(value: a, child: Text(a))).toList(),
+                    decoration: const InputDecoration(labelText: "Mức độ hoạt động"),
+                    items: activityOptions.map((a) => DropdownMenuItem(value: a, child: Text(activityLabelMap[a] ?? a))).toList(),
                     onChanged: (val) => setDialogState(() => editActivity = val!),
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     value: editGoal,
-                    decoration: const InputDecoration(labelText: "Goal"),
-                    items: goalOptions.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                    decoration: const InputDecoration(labelText: "Mục tiêu"),
+                    items: goalOptions.map((g) => DropdownMenuItem(value: g, child: Text(goalLabelMap[g] ?? g))).toList(),
                     onChanged: (val) => setDialogState(() => editGoal = val!),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: targetWeightController,
-                    decoration: const InputDecoration(labelText: "Target Weight (kg)", suffixText: "kg"),
+                    decoration: const InputDecoration(labelText: "Cân nặng mục tiêu (kg)", suffixText: "kg"),
                     keyboardType: TextInputType.number,
                   ),
                 ],
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text("Hủy", style: TextStyle(color: Colors.grey))),
                 ElevatedButton(
                   onPressed: () async {
                     final h = double.tryParse(heightController.text) ?? 170.0;
@@ -183,11 +200,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     // Client validation
                     if (editGoal == 'LoseWeight' && tw != null && tw >= w) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Target weight must be less than current weight to LoseWeight")));
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Cân nặng mục tiêu phải nhỏ hơn hiện tại để Giảm cân")));
                       return;
                     }
                     if (editGoal == 'GainWeight' && tw != null && tw <= w) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Target weight must be greater than current weight to GainWeight")));
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Cân nặng mục tiêu phải lớn hơn hiện tại để Tăng cân")));
                       return;
                     }
 
@@ -203,7 +220,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     Navigator.pop(context); // Close edit dialog
 
-                    // ✅ Optimistic update: apply values and calculate targets instantly
+                    // Optimistic update: apply values and calculate targets instantly
                     setState(() {
                       _gender = editGender;
                       _dob = editDob;
@@ -249,7 +266,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text("Failed to sync profile with server. Try again."),
+                              content: Text("Không thể đồng bộ hồ sơ với máy chủ. Vui lòng thử lại."),
                               backgroundColor: Colors.orange,
                               behavior: SnackBarBehavior.floating,
                             ),
@@ -261,14 +278,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     // Instantly notify success
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: const Text("Profile updated successfully!"),
+                        content: const Text("Đã cập nhật hồ sơ sức khỏe thành công!"),
                         backgroundColor: primaryGreen,
                         behavior: SnackBarBehavior.floating,
                       ),
                     );
                   },
                   style: ElevatedButton.styleFrom(backgroundColor: primaryGreen),
-                  child: const Text("Save", style: TextStyle(color: Colors.white)),
+                  child: const Text("Lưu", style: TextStyle(color: Colors.white)),
                 ),
               ],
             );
@@ -287,22 +304,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(isEdit ? 'Edit Food Allergy' : 'Add Food Allergy'),
+        title: Text(isEdit ? 'Sửa dị ứng thực phẩm' : 'Thêm dị ứng thực phẩm'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: nameController,
-              decoration: const InputDecoration(labelText: 'Allergy Name *'),
+              decoration: const InputDecoration(labelText: 'Tên loại dị ứng *'),
             ),
             TextField(
               controller: notesController,
-              decoration: const InputDecoration(labelText: 'Reaction Notes'),
+              decoration: const InputDecoration(labelText: 'Triệu chứng / Ghi chú'),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy', style: TextStyle(color: Colors.grey))),
           ElevatedButton(
             onPressed: () async {
               final name = nameController.text.trim();
@@ -317,7 +334,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               if (success) _loadProfileData();
             },
             style: ElevatedButton.styleFrom(backgroundColor: primaryGreen),
-            child: Text(isEdit ? 'Update' : 'Add', style: const TextStyle(color: Colors.white)),
+            child: Text(isEdit ? 'Cập nhật' : 'Thêm', style: const TextStyle(color: Colors.white)),
           )
         ],
       ),
@@ -333,22 +350,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(isEdit ? 'Edit Health Condition' : 'Add Health Condition'),
+        title: Text(isEdit ? 'Sửa tình trạng bệnh lý' : 'Thêm tình trạng bệnh lý'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: nameController,
-              decoration: const InputDecoration(labelText: 'Condition Name *'),
+              decoration: const InputDecoration(labelText: 'Tên bệnh lý *'),
             ),
             TextField(
               controller: notesController,
-              decoration: const InputDecoration(labelText: 'Severity/Notes'),
+              decoration: const InputDecoration(labelText: 'Mức độ / Ghi chú'),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy', style: TextStyle(color: Colors.grey))),
           ElevatedButton(
             onPressed: () async {
               final name = nameController.text.trim();
@@ -364,7 +381,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               if (success) _loadProfileData();
             },
             style: ElevatedButton.styleFrom(backgroundColor: primaryGreen),
-            child: Text(isEdit ? 'Update' : 'Add', style: const TextStyle(color: Colors.white)),
+            child: Text(isEdit ? 'Cập nhật' : 'Thêm', style: const TextStyle(color: Colors.white)),
           )
         ],
       ),
@@ -377,7 +394,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       backgroundColor: bgColor,
       appBar: AppBar(
         title: const Text(
-          'Health Profile',
+          'Hồ sơ Sức khỏe',
           style: TextStyle(color: Color(0xFF2D3748), fontWeight: FontWeight.bold, fontSize: 22),
         ),
         centerTitle: true,
@@ -390,19 +407,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
               padding: const EdgeInsets.all(20.0),
               child: Column(
                 children: [
-                  _buildProfileHeader(),
+                  AnimatedFadeSlide(
+                    delay: 0,
+                    child: _buildProfileHeader(),
+                  ),
                   const SizedBox(height: 25),
                   if (!_profileExists) ...[
-                    _buildNoProfileBanner(),
+                    AnimatedFadeSlide(
+                      delay: 100,
+                      child: _buildNoProfileBanner(),
+                    ),
                   ] else ...[
-                    _buildMetricsGrid(),
+                    AnimatedFadeSlide(
+                      delay: 100,
+                      child: _buildMetricsGrid(),
+                    ),
                     const SizedBox(height: 25),
-                    _buildAllergiesCard(),
+                    AnimatedFadeSlide(
+                      delay: 150,
+                      child: _buildAllergiesCard(),
+                    ),
                     const SizedBox(height: 25),
-                    _buildConditionsCard(),
+                    AnimatedFadeSlide(
+                      delay: 200,
+                      child: _buildConditionsCard(),
+                    ),
                   ],
                   const SizedBox(height: 35),
-                  _buildLogoutButton(),
+                  AnimatedFadeSlide(
+                    delay: 250,
+                    child: _buildLogoutButton(),
+                  ),
                 ],
               ),
             ),
@@ -431,7 +466,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ElevatedButton.icon(
           onPressed: _openEditProfileDialog,
           icon: const Icon(Icons.edit, size: 16, color: Colors.white),
-          label: Text(_profileExists ? "Edit Health Info" : "Create Health Profile", style: const TextStyle(color: Colors.white)),
+          label: Text(_profileExists ? "Sửa thông tin sức khỏe" : "Khởi tạo hồ sơ", style: const TextStyle(color: Colors.white)),
           style: ElevatedButton.styleFrom(
             backgroundColor: primaryGreen,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -454,12 +489,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Icon(Icons.warning_amber_rounded, color: Colors.amber.shade800, size: 40),
           const SizedBox(height: 12),
           Text(
-            "No Health Profile Yet",
+            "Chưa có hồ sơ sức khỏe",
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.amber.shade900),
           ),
           const SizedBox(height: 8),
           const Text(
-            "Configure your height, weight, activity level, and targets so we can tailor nutrition plans for you.",
+            "Vui lòng nhập chiều cao, cân nặng, mức độ vận động và mục tiêu để hệ thống tính toán thực đơn dinh dưỡng tối ưu cho bạn.",
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13, color: Color(0xFF5A6270)),
           ),
@@ -483,27 +518,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _metricCell("Height", "${_height.round()} cm"),
-              _metricCell("Weight", "${_weight.toStringAsFixed(1)} kg"),
-              _metricCell("BMI", _bmi.toStringAsFixed(1)),
+              _metricCell("Chiều cao", "${_height.round()} cm"),
+              _metricCell("Cân nặng", "${_weight.toStringAsFixed(1)} kg"),
+              _metricCell("Chỉ số BMI", _bmi.toStringAsFixed(1)),
             ],
           ),
           const Divider(height: 30),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _metricCell("Gender", _gender),
-              _metricCell("Age", "${DateTime.now().year - _dob.year} yrs"),
-              _metricCell("Daily Budget", "$_caloriesTarget kcal"),
+              _metricCell("Giới tính", genderLabelMap[_gender] ?? _gender),
+              _metricCell("Tuổi", "${DateTime.now().year - _dob.year} tuổi"),
+              _metricCell("Mục tiêu Calo ngày", "$_caloriesTarget kcal"),
             ],
           ),
           const Divider(height: 30),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _metricCell("Goal", _goal.replaceAll("Weight", " Weight")),
-              _metricCell("Target Weight", _targetWeight != null ? "${_targetWeight!.toStringAsFixed(1)} kg" : "-- kg"),
-              _metricCell("Activity", _activityLevel.replaceAll("Active", " Active")),
+              _metricCell("Mục tiêu cân nặng", goalLabelMap[_goal] ?? _goal),
+              _metricCell("Cân nặng đích", _targetWeight != null ? "${_targetWeight!.toStringAsFixed(1)} kg" : "-- kg"),
+              _metricCell("Hoạt động", activityLabelMap[_activityLevel] != null ? activityLabelMap[_activityLevel]!.split(' (')[0] : _activityLevel),
             ],
           ),
         ],
@@ -543,13 +578,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Food Allergies', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Text('Dị ứng thực phẩm', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               IconButton(icon: Icon(Icons.add, color: primaryGreen), onPressed: () => _openAddAllergyDialog()),
             ],
           ),
           const SizedBox(height: 10),
           _allergies.isEmpty
-              ? Text("No recorded food allergies.", style: TextStyle(color: Colors.grey[500], fontSize: 13))
+              ? Text("Không có ghi nhận dị ứng thực phẩm nào.", style: TextStyle(color: Colors.grey[500], fontSize: 13))
               : ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -561,7 +596,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.warning_amber_rounded, color: Colors.orange),
                       title: Text(item['allergyName'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text(item['notes'] ?? 'No reaction details'),
+                      subtitle: Text(item['notes'] ?? 'Không có chi tiết triệu chứng'),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -602,13 +637,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Health Conditions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Text('Tình trạng bệnh lý', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               IconButton(icon: Icon(Icons.add, color: primaryGreen), onPressed: () => _openAddConditionDialog()),
             ],
           ),
           const SizedBox(height: 10),
           _conditions.isEmpty
-              ? Text("No recorded health conditions.", style: TextStyle(color: Colors.grey[500], fontSize: 13))
+              ? Text("Không có ghi nhận tình trạng bệnh lý nào.", style: TextStyle(color: Colors.grey[500], fontSize: 13))
               : ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -620,7 +655,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.favorite_border, color: Colors.redAccent),
                       title: Text(item['conditionName'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text(item['notes'] ?? 'No notes'),
+                      subtitle: Text(item['notes'] ?? 'Không có ghi chú'),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -670,12 +705,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
           }
         },
         icon: const Icon(Icons.logout, color: Colors.redAccent),
-        label: const Text("Logout", style: TextStyle(color: Colors.redAccent, fontSize: 16, fontWeight: FontWeight.bold)),
+        label: const Text("Đăng xuất", style: TextStyle(color: Colors.redAccent, fontSize: 16, fontWeight: FontWeight.bold)),
         style: OutlinedButton.styleFrom(
           side: const BorderSide(color: Colors.redAccent, width: 1.5),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         ),
       ),
+    );
+  }
+}
+
+class AnimatedFadeSlide extends StatelessWidget {
+  final Widget child;
+  final int delay;
+
+  const AnimatedFadeSlide({
+    super.key,
+    required this.child,
+    required this.delay,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 400 + delay),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, (1.0 - value) * 15),
+            child: child,
+          ),
+        );
+      },
+      child: child,
     );
   }
 }

@@ -553,7 +553,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                   if (food['servingSize'] != null) ...[
                     const SizedBox(height: 4),
                     Text(
-                      "Serving Size: ${food['servingSize']}",
+                      "Khẩu phần: ${food['servingSize']}",
                       style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                     ),
                   ],
@@ -603,7 +603,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Nutrition Facts", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF2D3748))),
+          const Text("Thành phần dinh dưỡng", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF2D3748))),
           const Divider(thickness: 2, color: Colors.black),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -613,9 +613,9 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
             ],
           ),
           const Divider(thickness: 1, color: Colors.black),
-          _nutritionFactRow("Total Fat", fat, "g", bold: true),
-          _nutritionFactRow("Total Carbohydrate", carbs, "g", bold: true),
-          _nutritionFactRow("Protein", protein, "g", bold: true),
+          _nutritionFactRow("Tổng chất béo (Fat)", fat, "g", bold: true),
+          _nutritionFactRow("Tổng Carbohydrate", carbs, "g", bold: true),
+          _nutritionFactRow("Chất đạm (Protein)", protein, "g", bold: true),
         ],
       ),
     );
@@ -1296,7 +1296,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _currentSubTab == 0 ? "AI Meal Analysis" : "AI Nutrition Coach",
+                    _currentSubTab == 0 ? "Phân tích Bữa ăn AI" : "Trợ lý Dinh dưỡng AI",
                     style: const TextStyle(
                       color: Color(0xFF2D3748),
                       fontWeight: FontWeight.bold,
@@ -1409,7 +1409,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                     Icon(Icons.auto_awesome, size: 16, color: _currentSubTab == 0 ? primaryGreen : Colors.grey),
                     const SizedBox(width: 6),
                     Text(
-                      "AI Scan",
+                      "Quét món ăn AI",
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
@@ -1439,7 +1439,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                     Icon(Icons.chat_bubble_outline, size: 16, color: _currentSubTab == 1 ? primaryGreen : Colors.grey),
                     const SizedBox(width: 6),
                     Text(
-                      "AI Coach",
+                      "Trợ lý AI",
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
@@ -1462,305 +1462,325 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: primaryGreen.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
+          AnimatedFadeSlide(
+            delay: 0,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: primaryGreen.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.auto_awesome, color: primaryGreen, size: 24),
                       ),
-                      child: const Icon(Icons.auto_awesome, color: primaryGreen, size: 24),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        "AI Meal Analysis",
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF2D3748),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          "Phân tích Bữa ăn AI",
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF2D3748),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  "Instantly decode your meal's nutritional value using advanced visual recognition. Snap a photo or search to begin.",
-                  style: TextStyle(
-                    fontSize: 13,
-                    height: 1.5,
-                    color: Colors.grey[600],
+                    ],
                   ),
-                ),
-              ],
-            ),
-          ),
-
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
+                  const SizedBox(height: 10),
+                  Text(
+                    "Giải mã tức thì giá trị dinh dưỡng của món ăn bằng AI. Chụp ảnh hoặc tìm kiếm để bắt đầu.",
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.5,
+                      color: Colors.grey[600],
+                    ),
                   ),
                 ],
               ),
-              child: TextField(
-                readOnly: true,
-                onTap: () => _openManualSearchDialog(""),
-                decoration: InputDecoration(
-                  hintText: "Or search for food manually...",
-                  hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-                  prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            ),
+          ),
+
+          AnimatedFadeSlide(
+            delay: 100,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: TextField(
+                  readOnly: true,
+                  onTap: () => _openManualSearchDialog(""),
+                  decoration: InputDecoration(
+                    hintText: "Hoặc tìm kiếm món ăn thủ công...",
+                    hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+                    prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  ),
                 ),
               ),
             ),
           ),
           const SizedBox(height: 20),
 
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [lightGreen.withOpacity(0.8), Colors.white],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+          AnimatedFadeSlide(
+            delay: 200,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [lightGreen.withOpacity(0.8), Colors.white],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: Colors.green.shade100),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.green.shade100),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFE6F4EE),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Center(
-                      child: Icon(Icons.camera_alt, color: primaryGreen, size: 32),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    "Scan Your Meal",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF2D3748),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "Use your camera to identify ingredients and calculate macros instantly.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey[600],
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: 180,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: () => _pickAndScanFoodImage(preferredSource: ImageSource.camera),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryGreen,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        elevation: 4,
-                        shadowColor: primaryGreen.withOpacity(0.3),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFE6F4EE),
+                        shape: BoxShape.circle,
                       ),
-                      child: const Text(
-                        "Open Camera",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
+                      child: const Center(
+                        child: Icon(Icons.camera_alt, color: primaryGreen, size: 32),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      "Quét món ăn của bạn",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2D3748),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "Sử dụng máy ảnh của bạn để nhận diện nguyên liệu và tính toán calo lập tức.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey[600],
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: 180,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: () => _pickAndScanFoodImage(preferredSource: ImageSource.camera),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryGreen,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          elevation: 4,
+                          shadowColor: primaryGreen.withOpacity(0.3),
+                        ),
+                        child: const Text(
+                          "Mở Camera",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
           const SizedBox(height: 20),
 
           // ── AI Calorie Estimate (text-based, always works) ──
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Builder(builder: (context) {
-              final estimateCtrl = TextEditingController();
-              return Container(
+          AnimatedFadeSlide(
+            delay: 300,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Builder(builder: (context) {
+                final estimateCtrl = TextEditingController();
+                return Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [const Color(0xFF0D9488).withOpacity(0.08), Colors.white],
+                      begin: Alignment.topLeft, end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFF0D9488).withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.text_fields, color: Color(0xFF0D9488), size: 20),
+                          SizedBox(width: 8),
+                          Text('Nhập tên món ăn để ước tính',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF2D3748))),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      const Text('Không cần ảnh — nhập mô tả để nhận ước tính calo ngay lập tức.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: estimateCtrl,
+                              decoration: InputDecoration(
+                                hintText: 'Ví dụ: 1 bát phở bò, 2 cuốn chả giò...',
+                                hintStyle: const TextStyle(fontSize: 13),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              ),
+                              onSubmitted: (val) => _estimateCaloriesFromText(val),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          ElevatedButton(
+                            onPressed: () => _estimateCaloriesFromText(estimateCtrl.text),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0D9488),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                            ),
+                            child: const Icon(Icons.calculate, color: Colors.white, size: 20),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          AnimatedFadeSlide(
+            delay: 400,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [const Color(0xFF0D9488).withOpacity(0.08), Colors.white],
-                    begin: Alignment.topLeft, end: Alignment.bottomRight,
-                  ),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFF0D9488).withOpacity(0.3)),
+                  border: Border.all(color: Colors.grey.shade100),
                 ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.text_fields, color: Color(0xFF0D9488), size: 20),
-                        SizedBox(width: 8),
-                        Text('Nhập tên món ăn để ước tính',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF2D3748))),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    const Text('Không cần ảnh — nhập mô tả để nhận ước tính calo ngay lập tức.',
-                        style: TextStyle(fontSize: 12, color: Colors.grey)),
-                    const SizedBox(height: 14),
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        const Icon(Icons.auto_awesome, color: Colors.teal, size: 20),
+                        const SizedBox(width: 12),
                         Expanded(
-                          child: TextField(
-                            controller: estimateCtrl,
-                            decoration: InputDecoration(
-                              hintText: 'Ví dụ: 1 bát phở bò, 2 cuốn chả giò...',
-                              hintStyle: const TextStyle(fontSize: 13),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            ),
-                            onSubmitted: (val) => _estimateCaloriesFromText(val),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                "Thông tin từ AI",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF2D3748),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                "Mô hình thị giác máy tính của chúng tôi phân tích hình dạng, màu sắc và kết cấu thực phẩm để ước tính khẩu phần và phân bổ dinh dưỡng với độ chính xác cao.",
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey[600],
+                                  height: 1.5,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        ElevatedButton(
-                          onPressed: () => _estimateCaloriesFromText(estimateCtrl.text),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0D9488),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const Divider(height: 1),
+                    const SizedBox(height: 12),
+                    const Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            "Độ chính xác",
+                            style: TextStyle(fontSize: 13, color: Colors.grey),
                           ),
-                          child: const Icon(Icons.calculate, color: Colors.white, size: 20),
+                        ),
+                        Text(
+                          "~94%",
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.teal,
+                          ),
                         ),
                       ],
                     ),
                   ],
                 ),
-              );
-            }),
-          ),
-          const SizedBox(height: 20),
-
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.grey.shade100),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.auto_awesome, color: Colors.teal, size: 20),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "AI Insights",
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF2D3748),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              "Our computer vision model analyzes food shapes, colors, and textures to estimate portion sizes and macro distributions with clinical precision.",
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey[600],
-                                height: 1.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  const Divider(height: 1),
-                  const SizedBox(height: 12),
-                  const Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          "Accuracy",
-                          style: TextStyle(fontSize: 13, color: Colors.grey),
-                        ),
-                      ),
-                      Text(
-                        "~94%",
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.teal,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
               ),
             ),
           ),
 
           const SizedBox(height: 24),
 
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              "Recent Scans",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF2D3748),
+          AnimatedFadeSlide(
+            delay: 500,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                "Lượt quét gần đây",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2D3748),
+                ),
               ),
             ),
           ),
           const SizedBox(height: 12),
-          _recentScans.isEmpty
+          AnimatedFadeSlide(
+            delay: 600,
+            child: _recentScans.isEmpty
               ? Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(40),
@@ -1793,11 +1813,11 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                           final date = DateTime.parse(dateStr);
                           final diff = DateTime.now().difference(date);
                           if (diff.inDays == 0) {
-                            time = "Hôm nay, ${DateFormat('h:mm a').format(date)}";
+                            time = "Hôm nay, ${DateFormat('HH:mm').format(date)}";
                           } else if (diff.inDays == 1) {
-                            time = "Hôm qua, ${DateFormat('h:mm a').format(date)}";
+                            time = "Hôm qua, ${DateFormat('HH:mm').format(date)}";
                           } else {
-                            time = DateFormat('dd/MM, h:mm a').format(date);
+                            time = DateFormat('dd/MM, HH:mm').format(date);
                           }
                         } catch (e) {
                           // fallback
@@ -1945,6 +1965,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                     },
                   ),
                 ),
+          ),
           const SizedBox(height: 40),
         ],
       ),
@@ -2102,95 +2123,98 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
   }
 
   Widget _buildMessageBubble(_ChatMessage msg) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisAlignment: msg.isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-        children: [
-          if (!msg.isUser) ...[
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF006D44), Color(0xFF00A86B)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.psychology_alt, color: Colors.white, size: 18),
-            ),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: msg.isUser
-                    ? primaryGreen
-                    : msg.isError
-                        ? Colors.red.shade50
-                        : Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(18),
-                  topRight: const Radius.circular(18),
-                  bottomLeft: Radius.circular(msg.isUser ? 18 : 4),
-                  bottomRight: Radius.circular(msg.isUser ? 4 : 18),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+    return AnimatedFadeSlide(
+      delay: 50,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisAlignment: msg.isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+          children: [
+            if (!msg.isUser) ...[
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF006D44), Color(0xFF00A86B)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                ],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.psychology_alt, color: Colors.white, size: 18),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (msg.imageBytes != null) ...[
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.memory(
-                        msg.imageBytes!,
-                        height: 160,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
+              const SizedBox(width: 8),
+            ],
+            Flexible(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: msg.isUser
+                      ? primaryGreen
+                      : msg.isError
+                          ? Colors.red.shade50
+                          : Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: const Radius.circular(18),
+                    topRight: const Radius.circular(18),
+                    bottomLeft: Radius.circular(msg.isUser ? 18 : 4),
+                    bottomRight: Radius.circular(msg.isUser ? 4 : 18),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
                     ),
-                    const SizedBox(height: 8),
                   ],
-                  if (msg.reasoning != null && msg.reasoning!.isNotEmpty) ...[
-                    ReasoningCollapseWidget(reasoning: msg.reasoning!),
-                  ],
-                  if (msg.foodScanResult != null) ...[
-                    _buildInlineFoodScanWidget(msg.foodScanResult!),
-                  ] else ...[
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (msg.imageBytes != null) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.memory(
+                          msg.imageBytes!,
+                          height: 160,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    if (msg.reasoning != null && msg.reasoning!.isNotEmpty) ...[
+                      ReasoningCollapseWidget(reasoning: msg.reasoning!),
+                    ],
+                    if (msg.foodScanResult != null) ...[
+                      _buildInlineFoodScanWidget(msg.foodScanResult!),
+                    ] else ...[
+                      Text(
+                        msg.text,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: msg.isUser ? Colors.white : const Color(0xFF2D3748),
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 4),
                     Text(
-                      msg.text,
+                      DateFormat('HH:mm').format(msg.timestamp),
                       style: TextStyle(
-                        fontSize: 14,
-                        color: msg.isUser ? Colors.white : const Color(0xFF2D3748),
-                        height: 1.5,
+                        fontSize: 10,
+                        color: msg.isUser ? Colors.white70 : Colors.grey[400],
                       ),
                     ),
                   ],
-                  const SizedBox(height: 4),
-                  Text(
-                    DateFormat('HH:mm').format(msg.timestamp),
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: msg.isUser ? Colors.white70 : Colors.grey[400],
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
-          if (msg.isUser) const SizedBox(width: 8),
-        ],
+            if (msg.isUser) const SizedBox(width: 8),
+          ],
+        ),
       ),
     );
   }
@@ -2581,3 +2605,34 @@ class _ReasoningCollapseWidgetState extends State<ReasoningCollapseWidget> {
     );
   }
 }
+
+class AnimatedFadeSlide extends StatelessWidget {
+  final Widget child;
+  final int delay;
+
+  const AnimatedFadeSlide({
+    super.key,
+    required this.child,
+    required this.delay,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 400 + delay),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, (1.0 - value) * 15),
+            child: child,
+          ),
+        );
+      },
+      child: child,
+    );
+  }
+}
+

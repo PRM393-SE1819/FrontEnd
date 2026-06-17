@@ -26,6 +26,13 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
   final Color secondaryGreen = const Color(0xFFE6FFFA);
   final Color accentAmber = const Color(0xFFD97706);
 
+  final Map<String, String> mealTypeMap = {
+    'Breakfast': 'Bữa sáng',
+    'Lunch': 'Bữa trưa',
+    'Dinner': 'Bữa tối',
+    'Snack': 'Bữa phụ',
+  };
+
   @override
   void initState() {
     super.initState();
@@ -55,13 +62,25 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
 
   Future<void> _performSearch(String query) async {
     setState(() => _isSearching = true);
-    final results = await ApiService.searchFoods(query, page: 1, pageSize: 20);
+    final results = await ApiService.searchFoods(query, page: 1, pageSize: 100);
     if (mounted) {
       setState(() {
-        _searchResults = results != null ? results['items'] ?? [] : [];
-        
+        final List<dynamic> items = results != null ? results['items'] ?? [] : [];
+        // Sort custom foods first, then favorites, then standard foods
+        items.sort((a, b) {
+          final aCustom = (a['isCustom'] == true || a['foodType'] == 'Custom') ? 1 : 0;
+          final bCustom = (b['isCustom'] == true || b['foodType'] == 'Custom') ? 1 : 0;
+          if (aCustom != bCustom) {
+            return bCustom.compareTo(aCustom); // Custom foods at the absolute top
+          }
+          final aId = a['foodId'];
+          final bId = b['foodId'];
+          final aFav = _favoriteFoods.any((f) => f['foodId'] == aId) ? 1 : 0;
+          final bFav = _favoriteFoods.any((f) => f['foodId'] == bId) ? 1 : 0;
+          return bFav.compareTo(aFav); // Then favorite foods
+        });
+        _searchResults = items;
         _customFoods = _searchResults.where((food) => food['isCustom'] == true || food['foodType'] == 'Custom').toList();
-        
         _isSearching = false;
       });
     }
@@ -80,80 +99,24 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
 
     if (success) {
       await _loadFavorites();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(isFav ? "Removed from Favorites" : "Added to Favorites"),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: primaryGreen,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isFav ? "Đã xóa khỏi danh sách Yêu thích" : "Đã thêm vào danh sách Yêu thích"),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: primaryGreen,
+          ),
+        );
+      }
     }
   }
 
   void _openBarcodeScanner() {
-    final barcodeTextController = TextEditingController();
-    showDialog(
+    showDialog<String>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: [
-              Icon(Icons.qr_code_scanner, color: primaryGreen),
-              const SizedBox(width: 10),
-              const Text("Barcode Scanner", style: TextStyle(fontWeight: FontWeight.bold)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "Scan or enter barcode to quickly retrieve food details.",
-                style: TextStyle(fontSize: 14, color: Colors.grey),
-              ),
-              const SizedBox(height: 15),
-              TextField(
-                controller: barcodeTextController,
-                decoration: InputDecoration(
-                  labelText: "Enter Barcode Number",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  prefixIcon: const Icon(Icons.password),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.arrow_forward),
-                    onPressed: () {
-                      if (barcodeTextController.text.isNotEmpty) {
-                        Navigator.pop(context, barcodeTextController.text.trim());
-                      }
-                    },
-                  ),
-                ),
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 15),
-              const Text("Test Barcodes:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _barcodeChip("8934567890123", context),
-                  _barcodeChip("8936018619124", context),
-                  _barcodeChip("123456789", context),
-                ],
-              )
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel"),
-            ),
-          ],
-        );
-      },
+      builder: (context) => const BarcodeScannerDialog(),
     ).then((barcode) async {
-      if (barcode != null && barcode is String) {
+      if (barcode != null && barcode.isNotEmpty) {
         showDialog(
           context: context,
           barrierDismissible: false,
@@ -172,11 +135,11 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text("Barcode $barcode not found in database."),
+              content: Text("Mã vạch $barcode không tồn tại trong hệ thống."),
               backgroundColor: Colors.redAccent,
               behavior: SnackBarBehavior.floating,
               action: SnackBarAction(
-                label: "Create Food",
+                label: "Tự tạo món",
                 textColor: Colors.white,
                 onPressed: () => _openCustomFoodDialog(barcode: barcode),
               ),
@@ -185,15 +148,6 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
         }
       }
     });
-  }
-
-  Widget _barcodeChip(String code, BuildContext ctx) {
-    return ActionChip(
-      label: Text(code),
-      onPressed: () => Navigator.pop(ctx, code),
-      backgroundColor: primaryGreen.withOpacity(0.08),
-      labelStyle: TextStyle(color: primaryGreen, fontWeight: FontWeight.bold),
-    );
   }
 
   void _showFoodDetailsDialog(Map<String, dynamic> food) {
@@ -233,12 +187,12 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              food['name'] ?? "Food Item",
+                              food['name'] ?? "Tên món ăn",
                               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF2D3748)),
                             ),
                             if (food['servingSize'] != null)
                               Text(
-                                "Serving Size: ${food['servingSize']}",
+                                "Khẩu phần: ${food['servingSize']}",
                                 style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                               ),
                           ],
@@ -280,7 +234,7 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: const Text(
-                        "Add to Meal Log",
+                        "Thêm vào nhật ký ăn uống",
                         style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -313,22 +267,22 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Nutrition Facts", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF2D3748))),
+          const Text("Giá trị dinh dưỡng", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF2D3748))),
           const Divider(thickness: 2, color: Colors.black),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text("Calories", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+              const Text("Lượng Calo", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
               Text("${calories.round()} kcal", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
             ],
           ),
           const Divider(thickness: 1, color: Colors.black),
-          _nutritionRow("Total Fat", fat, "g", bold: true),
-          _nutritionRow("Total Carbohydrate", carbs, "g", bold: true),
-          _nutritionRow("  Dietary Fiber", fiber, "g"),
-          _nutritionRow("  Sugars", sugar, "g"),
-          _nutritionRow("Protein", protein, "g", bold: true),
-          _nutritionRow("Sodium", sodium, "mg"),
+          _nutritionRow("Tổng chất béo", fat, "g", bold: true),
+          _nutritionRow("Tổng bột đường (Carbs)", carbs, "g", bold: true),
+          _nutritionRow("  Chất xơ", fiber, "g"),
+          _nutritionRow("  Đường", sugar, "g"),
+          _nutritionRow("Chất đạm (Protein)", protein, "g", bold: true),
+          _nutritionRow("Natri (Sodium)", sodium, "mg"),
         ],
       ),
     );
@@ -371,18 +325,21 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
           builder: (context, setDialogState) {
             return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: const Text("Add to Meal Log", style: TextStyle(fontWeight: FontWeight.bold)),
+              title: const Text("Ghi nhận bữa ăn", style: TextStyle(fontWeight: FontWeight.bold)),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   DropdownButtonFormField<String>(
                     value: selectedMealType,
                     decoration: InputDecoration(
-                      labelText: "Meal Type",
+                      labelText: "Bữa ăn",
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     items: ['Breakfast', 'Lunch', 'Dinner', 'Snack'].map((type) {
-                      return DropdownMenuItem(value: type, child: Text(type));
+                      return DropdownMenuItem(
+                        value: type, 
+                        child: Text(mealTypeMap[type] ?? type),
+                      );
                     }).toList(),
                     onChanged: (val) {
                       if (val != null) {
@@ -394,7 +351,7 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
                   TextField(
                     controller: quantityController,
                     decoration: InputDecoration(
-                      labelText: "Quantity (grams / servings)",
+                      labelText: "Số lượng (g / khẩu phần)",
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       suffixText: "g",
                     ),
@@ -405,7 +362,7 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text("Cancel"),
+                  child: const Text("Hủy", style: TextStyle(color: Colors.grey)),
                 ),
                 ElevatedButton(
                   onPressed: () async {
@@ -413,7 +370,7 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
                     final mealData = {
                       "mealType": selectedMealType,
                       "mealDate": selectedTime.toIso8601String(),
-                      "notes": "Logged from search",
+                      "notes": "Được ghi từ thanh tìm kiếm",
                       "items": [
                         {
                           "foodId": food['foodId'],
@@ -437,7 +394,7 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
                     if (res != null) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text("Logged $selectedMealType successfully!"),
+                          content: Text("Đã thêm món ăn vào ${mealTypeMap[selectedMealType]}!"),
                           backgroundColor: primaryGreen,
                           behavior: SnackBarBehavior.floating,
                         ),
@@ -448,7 +405,7 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
                     backgroundColor: primaryGreen,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  child: const Text("Add Log", style: TextStyle(color: Colors.white)),
+                  child: const Text("Thêm", style: TextStyle(color: Colors.white)),
                 ),
               ],
             );
@@ -474,59 +431,62 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
         return AlertDialog(
           scrollable: true,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text(existingFood == null ? "Create Custom Food" : "Edit Custom Food", style: const TextStyle(fontWeight: FontWeight.bold)),
+          title: Text(
+            existingFood == null ? "Tạo món ăn tự tạo" : "Sửa món ăn tự tạo", 
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: nameController,
-                decoration: const InputDecoration(labelText: "Food Name *"),
+                decoration: const InputDecoration(labelText: "Tên món ăn *"),
               ),
               TextField(
                 controller: descController,
-                decoration: const InputDecoration(labelText: "Description"),
+                decoration: const InputDecoration(labelText: "Mô tả"),
               ),
               TextField(
                 controller: servingController,
-                decoration: const InputDecoration(labelText: "Serving Size (e.g. 100g, 1 slice)"),
+                decoration: const InputDecoration(labelText: "Khẩu phần (vd: 100g, 1 lát)"),
               ),
               TextField(
                 controller: calController,
-                decoration: const InputDecoration(labelText: "Calories (kcal) *"),
+                decoration: const InputDecoration(labelText: "Lượng Calo (kcal) *"),
                 keyboardType: TextInputType.number,
               ),
               TextField(
                 controller: protController,
-                decoration: const InputDecoration(labelText: "Protein (g)"),
+                decoration: const InputDecoration(labelText: "Chất đạm (Protein) (g)"),
                 keyboardType: TextInputType.number,
               ),
               TextField(
                 controller: carbController,
-                decoration: const InputDecoration(labelText: "Carbs (g)"),
+                decoration: const InputDecoration(labelText: "Chất bột đường (Carbs) (g)"),
                 keyboardType: TextInputType.number,
               ),
               TextField(
                 controller: fatController,
-                decoration: const InputDecoration(labelText: "Fat (g)"),
+                decoration: const InputDecoration(labelText: "Chất béo (Fats) (g)"),
                 keyboardType: TextInputType.number,
               ),
               TextField(
                 controller: barcodeController,
-                decoration: const InputDecoration(labelText: "Barcode (Optional)"),
+                decoration: const InputDecoration(labelText: "Mã vạch (Tùy chọn)"),
               ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel"),
+              child: const Text("Hủy", style: TextStyle(color: Colors.grey)),
             ),
             ElevatedButton(
               onPressed: () async {
                 final name = nameController.text.trim();
                 final cal = double.tryParse(calController.text) ?? 0.0;
                 if (name.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Name is required")));
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Vui lòng nhập tên món ăn")));
                   return;
                 }
 
@@ -559,18 +519,18 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
                   _performSearch(_searchController.text);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(existingFood == null ? "Custom food created!" : "Custom food updated!"),
+                      content: Text(existingFood == null ? "Đã tạo món ăn thành công!" : "Đã cập nhật món ăn thành công!"),
                       backgroundColor: primaryGreen,
                     ),
                   );
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Error submitting custom food details.")),
+                    const SnackBar(content: Text("Lỗi khi gửi thông tin món ăn tự tạo.")),
                   );
                 }
               },
               style: ElevatedButton.styleFrom(backgroundColor: primaryGreen),
-              child: const Text("Save", style: TextStyle(color: Colors.white)),
+              child: const Text("Lưu", style: TextStyle(color: Colors.white)),
             ),
           ],
         );
@@ -582,14 +542,14 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Delete Custom Food"),
-        content: const Text("Are you sure you want to delete this custom food?"),
+        title: const Text("Xóa món tự tạo"),
+        content: const Text("Bạn có chắc chắn muốn xóa món ăn tự tạo này không?"),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Hủy")),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-            child: const Text("Delete", style: TextStyle(color: Colors.white)),
+            child: const Text("Xóa", style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -612,7 +572,7 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text("Custom food deleted successfully"),
+              content: Text("Đã xóa món ăn tự tạo thành công"),
               backgroundColor: Colors.green,
             ),
           );
@@ -621,7 +581,7 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text("Error: Cannot delete custom food. You may not be the owner of this food item."),
+              content: Text("Lỗi: Không thể xóa món ăn này."),
               backgroundColor: Colors.redAccent,
             ),
           );
@@ -636,7 +596,7 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
       backgroundColor: const Color(0xFFF7FAFC),
       appBar: AppBar(
         title: const Text(
-          "Food & Nutrition Hub",
+          "Tra cứu dinh dưỡng",
           style: TextStyle(color: Color(0xFF2D3748), fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white,
@@ -647,9 +607,9 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
           unselectedLabelColor: Colors.grey,
           indicatorColor: primaryGreen,
           tabs: const [
-            Tab(text: "Search Foods", icon: Icon(Icons.search)),
-            Tab(text: "Favorites", icon: Icon(Icons.favorite)),
-            Tab(text: "My Custom Foods", icon: Icon(Icons.dining_outlined)),
+            Tab(text: "Tìm món ăn", icon: Icon(Icons.search)),
+            Tab(text: "Yêu thích", icon: Icon(Icons.favorite)),
+            Tab(text: "Món tự tạo", icon: Icon(Icons.dining_outlined)),
           ],
         ),
       ),
@@ -675,7 +635,7 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
                 child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: "Search standard or custom foods...",
+                    hintText: "Tìm món tiêu chuẩn hoặc món tự tạo...",
                     prefixIcon: const Icon(Icons.search),
                     filled: true,
                     fillColor: Colors.white,
@@ -711,12 +671,12 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
                           children: [
                             Icon(Icons.restaurant, size: 60, color: Colors.grey[300]),
                             const SizedBox(height: 12),
-                            Text("No foods found.", style: TextStyle(color: Colors.grey[500])),
+                            Text("Không tìm thấy món ăn nào.", style: TextStyle(color: Colors.grey[500])),
                             const SizedBox(height: 12),
                             ElevatedButton(
                               onPressed: () => _openCustomFoodDialog(),
                               style: ElevatedButton.styleFrom(backgroundColor: primaryGreen),
-                              child: const Text("Create Custom Food", style: TextStyle(color: Colors.white)),
+                              child: const Text("Tạo món ăn tự tạo", style: TextStyle(color: Colors.white)),
                             )
                           ],
                         ),
@@ -725,7 +685,10 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
                         itemCount: _searchResults.length,
                         itemBuilder: (context, index) {
                           final food = _searchResults[index];
-                          return _buildFoodCard(food);
+                          return AnimatedFadeSlide(
+                            delay: (index * 50).clamp(0, 300),
+                            child: _buildFoodCard(food),
+                          );
                         },
                       ),
           ),
@@ -744,7 +707,7 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
                   children: [
                     Icon(Icons.favorite_border, size: 60, color: Colors.grey[300]),
                     const SizedBox(height: 12),
-                    Text("No favorite foods logged yet.", style: TextStyle(color: Colors.grey[500])),
+                    Text("Chưa có món ăn yêu thích nào.", style: TextStyle(color: Colors.grey[500])),
                   ],
                 ),
               )
@@ -754,7 +717,10 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
                   itemCount: _favoriteFoods.length,
                   itemBuilder: (context, index) {
                     final food = _favoriteFoods[index];
-                    return _buildFoodCard(food);
+                    return AnimatedFadeSlide(
+                      delay: (index * 50).clamp(0, 300),
+                      child: _buildFoodCard(food),
+                    );
                   },
                 ),
               );
@@ -769,13 +735,13 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                "My Created Dishes",
+                "Món ăn đã tự tạo của tôi",
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF2D3748)),
               ),
               ElevatedButton.icon(
                 onPressed: () => _openCustomFoodDialog(),
                 icon: const Icon(Icons.add, color: Colors.white, size: 18),
-                label: const Text("Add Custom", style: TextStyle(color: Colors.white)),
+                label: const Text("Thêm món", style: TextStyle(color: Colors.white)),
                 style: ElevatedButton.styleFrom(backgroundColor: primaryGreen),
               )
             ],
@@ -789,7 +755,7 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
                       children: [
                         Icon(Icons.dining_outlined, size: 60, color: Colors.grey[300]),
                         const SizedBox(height: 12),
-                        Text("You haven't added any custom foods.", style: TextStyle(color: Colors.grey[500])),
+                        Text("Bạn chưa tự tạo món ăn nào.", style: TextStyle(color: Colors.grey[500])),
                       ],
                     ),
                   )
@@ -797,7 +763,10 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
                     itemCount: _customFoods.length,
                     itemBuilder: (context, index) {
                       final food = _customFoods[index];
-                      return _buildFoodCard(food, isCustomTab: true);
+                      return AnimatedFadeSlide(
+                        delay: (index * 50).clamp(0, 300),
+                        child: _buildFoodCard(food, isCustomTab: true),
+                      );
                     },
                   ),
           ),
@@ -840,14 +809,14 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      food['name'] ?? "Food Item",
+                      food['name'] ?? "Món ăn",
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF2D3748)),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      "${calories.round()} kcal | P:${protein.round()}g C:${carbs.round()}g F:${fat.round()}g",
+                      "${calories.round()} kcal | Đạm:${protein.round()}g Đường:${carbs.round()}g Béo:${fat.round()}g",
                       style: TextStyle(color: Colors.grey[600], fontSize: 13),
                     ),
                   ],
@@ -883,5 +852,247 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
     _searchController.dispose();
     _tabController.dispose();
     super.dispose();
+  }
+}
+
+class AnimatedFadeSlide extends StatelessWidget {
+  final Widget child;
+  final int delay;
+
+  const AnimatedFadeSlide({
+    super.key,
+    required this.child,
+    required this.delay,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 400 + delay),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, (1.0 - value) * 15),
+            child: child,
+          ),
+        );
+      },
+      child: child,
+    );
+  }
+}
+
+class BarcodeScannerDialog extends StatefulWidget {
+  const BarcodeScannerDialog({super.key});
+
+  @override
+  State<BarcodeScannerDialog> createState() => _BarcodeScannerDialogState();
+}
+
+class _BarcodeScannerDialogState extends State<BarcodeScannerDialog> with SingleTickerProviderStateMixin {
+  static const Color primaryGreen = Color(0xFF006D44);
+  late AnimationController _animController;
+  final _controller = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      backgroundColor: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: primaryGreen.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.qr_code_scanner, color: primaryGreen, size: 22),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  "Quét mã vạch",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF2D3748)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              "Đặt mã vạch vào khung hình hoặc nhập mã vạch bên dưới để tra cứu thông tin dinh dưỡng.",
+              style: TextStyle(fontSize: 13, color: Color(0xFF718096), height: 1.4),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            
+            // Viewfinder Simulator
+            Container(
+              width: 200,
+              height: 140,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A202C),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  )
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Stack(
+                  children: [
+                    // Corner markers
+                    Positioned(
+                      top: 10, left: 10,
+                      child: Container(width: 20, height: 20, decoration: const BoxDecoration(
+                        border: Border(top: BorderSide(color: primaryGreen, width: 3), left: BorderSide(color: primaryGreen, width: 3)),
+                      )),
+                    ),
+                    Positioned(
+                      top: 10, right: 10,
+                      child: Container(width: 20, height: 20, decoration: const BoxDecoration(
+                        border: Border(top: BorderSide(color: primaryGreen, width: 3), right: BorderSide(color: primaryGreen, width: 3)),
+                      )),
+                    ),
+                    Positioned(
+                      bottom: 10, left: 10,
+                      child: Container(width: 20, height: 20, decoration: const BoxDecoration(
+                        border: Border(bottom: BorderSide(color: primaryGreen, width: 3), left: BorderSide(color: primaryGreen, width: 3)),
+                      )),
+                    ),
+                    Positioned(
+                      bottom: 10, right: 10,
+                      child: Container(width: 20, height: 20, decoration: const BoxDecoration(
+                        border: Border(bottom: BorderSide(color: primaryGreen, width: 3), right: BorderSide(color: primaryGreen, width: 3)),
+                      )),
+                    ),
+                    
+                    // Laser Scanner Simulation Line
+                    AnimatedBuilder(
+                      animation: _animController,
+                      builder: (context, child) {
+                        return Positioned(
+                          top: 20 + (100 * _animController.value),
+                          left: 15,
+                          right: 15,
+                          child: Container(
+                            height: 2.5,
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.redAccent.withOpacity(0.8),
+                                  blurRadius: 8,
+                                  spreadRadius: 2,
+                                )
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    
+                    // Centered Help Icon
+                    const Center(
+                      child: Opacity(
+                        opacity: 0.15,
+                        child: Icon(Icons.qr_code, size: 64, color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 24),
+            
+            // Manual Input TextField
+            TextField(
+              controller: _controller,
+              decoration: InputDecoration(
+                labelText: "Nhập mã vạch sản phẩm",
+                hintText: "Ví dụ: 8934567890123",
+                prefixIcon: const Icon(Icons.keyboard_outlined, color: Colors.grey),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: primaryGreen, width: 2),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+              keyboardType: TextInputType.number,
+              onSubmitted: (val) {
+                if (val.trim().isNotEmpty) {
+                  Navigator.pop(context, val.trim());
+                }
+              },
+            ),
+            
+            const SizedBox(height: 20),
+            
+            // Action Buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Hủy", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600)),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: () {
+                    final text = _controller.text.trim();
+                    if (text.isNotEmpty) {
+                      Navigator.pop(context, text);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Vui lòng nhập mã vạch")),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryGreen,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    "Tra cứu",
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

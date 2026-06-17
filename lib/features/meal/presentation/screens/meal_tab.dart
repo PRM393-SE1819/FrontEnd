@@ -27,6 +27,13 @@ class _MealTabState extends State<MealTab> {
   final Color primaryGreen = const Color(0xFF006D44);
   final Color secondaryGreen = const Color(0xFFE6FFFA);
 
+  final Map<String, String> mealTypeMap = {
+    'Breakfast': 'Bữa sáng',
+    'Lunch': 'Bữa trưa',
+    'Dinner': 'Bữa tối',
+    'Snack': 'Bữa phụ',
+  };
+
   @override
   void initState() {
     super.initState();
@@ -101,14 +108,14 @@ class _MealTabState extends State<MealTab> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Delete Meal Log"),
-        content: const Text("Are you sure you want to delete this meal log?"),
+        title: const Text("Xóa nhật ký bữa ăn"),
+        content: const Text("Bạn có chắc chắn muốn xóa nhật ký bữa ăn này không?"),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Hủy")),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-            child: const Text("Delete", style: TextStyle(color: Colors.white)),
+            child: const Text("Xóa", style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -119,7 +126,7 @@ class _MealTabState extends State<MealTab> {
       if (success) {
         _loadMealLogs();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Meal deleted successfully")),
+          const SnackBar(content: Text("Đã xóa nhật ký bữa ăn thành công")),
         );
       }
     }
@@ -146,32 +153,40 @@ class _MealTabState extends State<MealTab> {
                 builder: (context) {
                   return StatefulBuilder(
                     builder: (context, setSearchState) {
+                      Future<void> performSearch(String query) async {
+                        setSearchState(() => searchingFood = true);
+                        final results = await ApiService.searchFoods(query, pageSize: 100);
+                        final favs = await ApiService.getFavoriteFoods() ?? [];
+                        setSearchState(() {
+                          final List<dynamic> loaded = results != null ? results['items'] ?? [] : [];
+                          final favIds = favs.map((f) => f['foodId']).toSet();
+                          for (var f in loaded) {
+                            f['isFavorite'] = favIds.contains(f['foodId']);
+                          }
+                          // Sort custom foods first, then favorites, then standard foods
+                          loaded.sort((a, b) {
+                            final aCustom = (a['isCustom'] == true || a['foodType'] == 'Custom') ? 1 : 0;
+                            final bCustom = (b['isCustom'] == true || b['foodType'] == 'Custom') ? 1 : 0;
+                            if (aCustom != bCustom) {
+                              return bCustom.compareTo(aCustom); // Custom foods at the absolute top
+                            }
+                            final aFav = a['isFavorite'] == true ? 1 : 0;
+                            final bFav = b['isFavorite'] == true ? 1 : 0;
+                            return bFav.compareTo(aFav); // Then favorites
+                          });
+                          foodResults = loaded;
+                          searchingFood = false;
+                        });
+                      }
+
                       if (!initiated) {
                         initiated = true;
-                        Future.microtask(() async {
-                          final results = await ApiService.searchFoods("");
-                          final favs = await ApiService.getFavoriteFoods() ?? [];
-                          setSearchState(() {
-                            final List<dynamic> loaded = results != null ? results['items'] ?? [] : [];
-                            final favIds = favs.map((f) => f['foodId']).toSet();
-                            for (var f in loaded) {
-                              f['isFavorite'] = favIds.contains(f['foodId']);
-                            }
-                            // Sort favorites to the top
-                            loaded.sort((a, b) {
-                              final aFav = a['isFavorite'] == true ? 1 : 0;
-                              final bFav = b['isFavorite'] == true ? 1 : 0;
-                              return bFav.compareTo(aFav);
-                            });
-                            foodResults = loaded;
-                            searchingFood = false;
-                          });
-                        });
+                        Future.microtask(() => performSearch(""));
                       }
 
                       return AlertDialog(
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                        title: const Text("Search Food to Add"),
+                        title: const Text("Tìm món ăn để thêm"),
                         content: SizedBox(
                           width: double.maxFinite,
                           child: Column(
@@ -180,39 +195,13 @@ class _MealTabState extends State<MealTab> {
                               TextField(
                                 controller: searchController,
                                 decoration: InputDecoration(
-                                  hintText: "Type food name...",
+                                  hintText: "Nhập tên món ăn...",
                                   suffixIcon: IconButton(
                                     icon: const Icon(Icons.search),
-                                    onPressed: () async {
-                                      setSearchState(() => searchingFood = true);
-                                      final results = await ApiService.searchFoods(searchController.text.trim());
-                                      final favs = await ApiService.getFavoriteFoods() ?? [];
-                                      setSearchState(() {
-                                        final List<dynamic> loaded = results != null ? results['items'] ?? [] : [];
-                                        final favIds = favs.map((f) => f['foodId']).toSet();
-                                        for (var f in loaded) {
-                                          f['isFavorite'] = favIds.contains(f['foodId']);
-                                        }
-                                        foodResults = loaded;
-                                        searchingFood = false;
-                                      });
-                                    },
+                                    onPressed: () => performSearch(searchController.text.trim()),
                                   ),
                                 ),
-                                onSubmitted: (val) async {
-                                  setSearchState(() => searchingFood = true);
-                                  final results = await ApiService.searchFoods(val.trim());
-                                  final favs = await ApiService.getFavoriteFoods() ?? [];
-                                  setSearchState(() {
-                                    final List<dynamic> loaded = results != null ? results['items'] ?? [] : [];
-                                    final favIds = favs.map((f) => f['foodId']).toSet();
-                                    for (var f in loaded) {
-                                      f['isFavorite'] = favIds.contains(f['foodId']);
-                                    }
-                                    foodResults = loaded;
-                                    searchingFood = false;
-                                  });
-                                },
+                                onSubmitted: (val) => performSearch(val.trim()),
                               ),
                               const SizedBox(height: 10),
                               searchingFood
@@ -252,7 +241,7 @@ class _MealTabState extends State<MealTab> {
                                                             color: Colors.teal.shade50,
                                                             borderRadius: BorderRadius.circular(4),
                                                             border: Border.all(color: Colors.teal.shade200, width: 0.5),
-                                                          ),
+                                                            ),
                                                           child: Text(
                                                             "Tự tạo",
                                                             style: TextStyle(fontSize: 10, color: Colors.teal.shade700, fontWeight: FontWeight.bold),
@@ -281,23 +270,23 @@ class _MealTabState extends State<MealTab> {
                   showDialog(
                     context: context,
                     builder: (context) => AlertDialog(
-                      title: Text("Quantity for ${selectedFood['name']}"),
+                      title: Text("Số lượng cho ${selectedFood['name']}"),
                       content: TextField(
                         controller: qtyController,
                         decoration: const InputDecoration(
-                          labelText: "Weight (grams / servings)",
+                          labelText: "Khối lượng (gram / khẩu phần)",
                           suffixText: "g",
                         ),
                         keyboardType: TextInputType.number,
                       ),
                       actions: [
-                        TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+                        TextButton(onPressed: () => Navigator.pop(context), child: const Text("Hủy")),
                         ElevatedButton(
                           onPressed: () {
                             final qty = double.tryParse(qtyController.text) ?? 100.0;
                             Navigator.pop(context, qty);
                           },
-                          child: const Text("OK"),
+                          child: const Text("Xác nhận"),
                         ),
                       ],
                     ),
@@ -319,7 +308,7 @@ class _MealTabState extends State<MealTab> {
 
             return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: const Text("Log New Meal", style: TextStyle(fontWeight: FontWeight.bold)),
+              title: const Text("Ghi nhận bữa ăn mới", style: TextStyle(fontWeight: FontWeight.bold)),
               content: SizedBox(
                 width: double.maxFinite,
                 child: SingleChildScrollView(
@@ -329,11 +318,14 @@ class _MealTabState extends State<MealTab> {
                       DropdownButtonFormField<String>(
                         value: selectedMealType,
                         decoration: InputDecoration(
-                          labelText: "Meal Type",
+                          labelText: "Loại bữa ăn",
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                         items: ['Breakfast', 'Lunch', 'Dinner', 'Snack'].map((type) {
-                          return DropdownMenuItem(value: type, child: Text(type));
+                          return DropdownMenuItem(
+                            value: type, 
+                            child: Text(mealTypeMap[type] ?? type),
+                          );
                         }).toList(),
                         onChanged: (val) {
                           if (val != null) {
@@ -345,7 +337,7 @@ class _MealTabState extends State<MealTab> {
                       TextField(
                         controller: notesController,
                         decoration: InputDecoration(
-                          labelText: "Meal Notes (Optional)",
+                          labelText: "Ghi chú bữa ăn (Tùy chọn)",
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
@@ -353,11 +345,11 @@ class _MealTabState extends State<MealTab> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text("Food Items", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          const Text("Các món ăn", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                           TextButton.icon(
                             onPressed: searchAndAddFood,
                             icon: const Icon(Icons.add),
-                            label: const Text("Add Food"),
+                            label: const Text("Thêm món"),
                           )
                         ],
                       ),
@@ -370,7 +362,7 @@ class _MealTabState extends State<MealTab> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: const Center(
-                                child: Text("No food items added yet.", style: TextStyle(color: Colors.grey)),
+                                child: Text("Chưa có món ăn nào được thêm.", style: TextStyle(color: Colors.grey)),
                               ),
                             )
                           : ListView.builder(
@@ -400,7 +392,7 @@ class _MealTabState extends State<MealTab> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text("Cancel"),
+                  child: const Text("Hủy", style: TextStyle(color: Colors.grey)),
                 ),
                 ElevatedButton(
                   onPressed: mealItems.isEmpty
@@ -432,7 +424,7 @@ class _MealTabState extends State<MealTab> {
                             _loadMealLogs();
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text("Logged $selectedMealType successfully!"),
+                                content: Text("Đã thêm bữa ăn vào ${mealTypeMap[selectedMealType]} thành công!"),
                                 backgroundColor: primaryGreen,
                               ),
                             );
@@ -442,7 +434,7 @@ class _MealTabState extends State<MealTab> {
                     backgroundColor: primaryGreen,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  child: const Text("Log Meal", style: TextStyle(color: Colors.white)),
+                  child: const Text("Lưu", style: TextStyle(color: Colors.white)),
                 ),
               ],
             );
@@ -452,13 +444,32 @@ class _MealTabState extends State<MealTab> {
     );
   }
 
+  String _getFormattedDate() {
+    final isToday = DateFormat('yyyy-MM-dd').format(_selectedDate) == DateFormat('yyyy-MM-dd').format(DateTime.now());
+    if (isToday) {
+      return "Hôm nay, ngày ${DateFormat('dd/MM/yyyy').format(_selectedDate)}";
+    }
+    final weekdayMap = {
+      'Monday': 'Thứ Hai',
+      'Tuesday': 'Thứ Ba',
+      'Wednesday': 'Thứ Tư',
+      'Thursday': 'Thứ Năm',
+      'Friday': 'Thứ Sáu',
+      'Saturday': 'Thứ Bảy',
+      'Sunday': 'Chủ Nhật',
+    };
+    final englishDay = DateFormat('EEEE').format(_selectedDate);
+    final vietnameseDay = weekdayMap[englishDay] ?? englishDay;
+    return "$vietnameseDay, ngày ${DateFormat('dd/MM/yyyy').format(_selectedDate)}";
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7FAFC),
       appBar: AppBar(
         title: const Text(
-          "Meal Logs & History",
+          "Nhật ký bữa ăn",
           style: TextStyle(color: Color(0xFF2D3748), fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white,
@@ -481,9 +492,15 @@ class _MealTabState extends State<MealTab> {
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       children: [
-                        _buildDailySummaryCard(),
+                        AnimatedFadeSlide(
+                          delay: 0,
+                          child: _buildDailySummaryCard(),
+                        ),
                         const SizedBox(height: 20),
-                        _buildMealHistorySection(),
+                        AnimatedFadeSlide(
+                          delay: 100,
+                          child: _buildMealHistorySection(),
+                        ),
                       ],
                     ),
                   ),
@@ -500,7 +517,6 @@ class _MealTabState extends State<MealTab> {
   }
 
   Widget _buildDateBanner() {
-    final isToday = DateFormat('yyyy-MM-dd').format(_selectedDate) == DateFormat('yyyy-MM-dd').format(DateTime.now());
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -512,7 +528,7 @@ class _MealTabState extends State<MealTab> {
             onPressed: () => _changeDate(-1),
           ),
           Text(
-            isToday ? "Today, ${DateFormat('MMMM dd, yyyy').format(_selectedDate)}" : DateFormat('EEEE, MMM dd, yyyy').format(_selectedDate),
+            _getFormattedDate(),
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF2D3748)),
           ),
           IconButton(
@@ -538,7 +554,7 @@ class _MealTabState extends State<MealTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Nutrition Intake Summary", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF2D3748))),
+          const Text("Tổng hợp dinh dưỡng đã nạp", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF2D3748))),
           const SizedBox(height: 15),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -550,7 +566,7 @@ class _MealTabState extends State<MealTab> {
                     "${_caloriesConsumed.round()}",
                     style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: primaryGreen),
                   ),
-                  const Text("Consumed (kcal)", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  const Text("Đã nạp (kcal)", style: TextStyle(color: Colors.grey, fontSize: 12)),
                 ],
               ),
               Column(
@@ -560,7 +576,7 @@ class _MealTabState extends State<MealTab> {
                     "${_caloriesTarget.round()}",
                     style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF2D3748)),
                   ),
-                  const Text("Target Budget", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  const Text("Mục tiêu (kcal)", style: TextStyle(color: Colors.grey, fontSize: 12)),
                 ],
               ),
               Column(
@@ -574,7 +590,7 @@ class _MealTabState extends State<MealTab> {
                       color: _remaining > 0 ? Colors.green[700] : Colors.redAccent,
                     ),
                   ),
-                  const Text("Remaining", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  const Text("Còn lại (kcal)", style: TextStyle(color: Colors.grey, fontSize: 12)),
                 ],
               ),
             ],
@@ -582,20 +598,27 @@ class _MealTabState extends State<MealTab> {
           const SizedBox(height: 15),
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
-            child: LinearProgressIndicator(
-              value: caloriePercent,
-              minHeight: 8,
-              color: primaryGreen,
-              backgroundColor: Colors.grey.shade100,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: 0, end: caloriePercent),
+              duration: const Duration(milliseconds: 1000),
+              curve: Curves.easeOutCubic,
+              builder: (context, value, child) {
+                return LinearProgressIndicator(
+                  value: value,
+                  minHeight: 8,
+                  color: primaryGreen,
+                  backgroundColor: Colors.grey.shade100,
+                );
+              },
             ),
           ),
           const SizedBox(height: 15),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _macroMetric("Protein", "${_protein.round()}g"),
-              _macroMetric("Carbs", "${_carbs.round()}g"),
-              _macroMetric("Fats", "${_fat.round()}g"),
+              _macroMetric("Đạm (Protein)", "${_protein.round()}g"),
+              _macroMetric("Tinh bột (Carbs)", "${_carbs.round()}g"),
+              _macroMetric("Chất béo (Fats)", "${_fat.round()}g"),
             ],
           )
         ],
@@ -617,7 +640,7 @@ class _MealTabState extends State<MealTab> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          "Logged Meals",
+          "Các bữa ăn đã ghi",
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF2D3748)),
         ),
         const SizedBox(height: 12),
@@ -634,7 +657,7 @@ class _MealTabState extends State<MealTab> {
                     Icon(Icons.restaurant, size: 48, color: Colors.grey[300]),
                     const SizedBox(height: 10),
                     const Text(
-                      "No meals logged for this day.",
+                      "Không có nhật ký bữa ăn nào cho ngày này.",
                       style: TextStyle(color: Colors.grey, fontSize: 14),
                     ),
                   ],
@@ -646,7 +669,10 @@ class _MealTabState extends State<MealTab> {
                 itemCount: _meals.length,
                 itemBuilder: (context, idx) {
                   final meal = _meals[idx];
-                  return _buildMealCard(meal);
+                  return AnimatedFadeSlide(
+                    delay: (idx * 50).clamp(0, 300),
+                    child: _buildMealCard(meal),
+                  );
                 },
               ),
       ],
@@ -685,9 +711,9 @@ class _MealTabState extends State<MealTab> {
           decoration: BoxDecoration(color: iconColor.withOpacity(0.1), shape: BoxShape.circle),
           child: Icon(typeIcon, color: iconColor),
         ),
-        title: Text(mealType, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        title: Text(mealTypeMap[mealType] ?? mealType, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         subtitle: Text(
-          "${calories.round()} kcal | ${items.length} items",
+          "${calories.round()} kcal | ${items.length} món ăn",
           style: TextStyle(color: Colors.grey[600], fontSize: 13),
         ),
         trailing: IconButton(
@@ -702,7 +728,7 @@ class _MealTabState extends State<MealTab> {
               children: [
                 if (meal['notes'] != null && meal['notes'].toString().isNotEmpty) ...[
                   Text(
-                    "Notes: ${meal['notes']}",
+                    "Ghi chú: ${meal['notes']}",
                     style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Colors.grey),
                   ),
                   const Divider(),
@@ -739,6 +765,36 @@ class _MealTabState extends State<MealTab> {
           )
         ],
       ),
+    );
+  }
+}
+
+class AnimatedFadeSlide extends StatelessWidget {
+  final Widget child;
+  final int delay;
+
+  const AnimatedFadeSlide({
+    super.key,
+    required this.child,
+    required this.delay,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 400 + delay),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, (1.0 - value) * 15),
+            child: child,
+          ),
+        );
+      },
+      child: child,
     );
   }
 }

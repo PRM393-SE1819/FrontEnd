@@ -99,6 +99,25 @@ class _DashboardTabState extends State<DashboardTab> {
     _loadDashboardData();
   }
 
+  String _getFormattedDate() {
+    final isToday = DateFormat('yyyy-MM-dd').format(_selectedDate) == DateFormat('yyyy-MM-dd').format(DateTime.now());
+    if (isToday) {
+      return "Hôm nay, ${DateFormat('dd/MM').format(_selectedDate)}";
+    }
+    final weekdayMap = {
+      'Monday': 'Thứ Hai',
+      'Tuesday': 'Thứ Ba',
+      'Wednesday': 'Thứ Tư',
+      'Thursday': 'Thứ Năm',
+      'Friday': 'Thứ Sáu',
+      'Saturday': 'Thứ Bảy',
+      'Sunday': 'Chủ Nhật',
+    };
+    final englishDay = DateFormat('EEEE').format(_selectedDate);
+    final vietnameseDay = weekdayMap[englishDay] ?? englishDay;
+    return "$vietnameseDay, ${DateFormat('dd/MM').format(_selectedDate)}";
+  }
+
   @override
   Widget build(BuildContext context) {
     final caloriePercent = _caloriesTarget > 0 ? (_caloriesConsumed / _caloriesTarget).clamp(0.0, 1.0) : 0.0;
@@ -123,9 +142,15 @@ class _DashboardTabState extends State<DashboardTab> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildHeader(),
+                  AnimatedFadeSlide(
+                    delay: 0,
+                    child: _buildHeader(),
+                  ),
                   const SizedBox(height: 20),
-                  _buildDateSelector(),
+                  AnimatedFadeSlide(
+                    delay: 50,
+                    child: _buildDateSelector(),
+                  ),
                   const SizedBox(height: 25),
                   _isLoading
                       ? Center(
@@ -136,15 +161,30 @@ class _DashboardTabState extends State<DashboardTab> {
                         )
                       : Column(
                           children: [
-                            _buildCalorieCard(caloriePercent, remainingCalories),
+                            AnimatedFadeSlide(
+                              delay: 100,
+                              child: _buildCalorieCard(caloriePercent, remainingCalories),
+                            ),
                             const SizedBox(height: 20),
-                            _buildMacrosCard(),
+                            AnimatedFadeSlide(
+                              delay: 150,
+                              child: _buildMacrosCard(),
+                            ),
                             const SizedBox(height: 20),
-                            _buildWaterWeightRow(),
+                            AnimatedFadeSlide(
+                              delay: 200,
+                              child: _buildWaterWeightRow(),
+                            ),
                             const SizedBox(height: 20),
-                            _buildAiCoachBanner(),
+                            AnimatedFadeSlide(
+                              delay: 250,
+                              child: _buildAiCoachBanner(),
+                            ),
                             const SizedBox(height: 20),
-                            _buildQuickActions(),
+                            AnimatedFadeSlide(
+                              delay: 300,
+                              child: _buildQuickActions(),
+                            ),
                           ],
                         ),
                 ],
@@ -164,11 +204,11 @@ class _DashboardTabState extends State<DashboardTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              "Daily Dashboard",
+              "Tổng quan ngày",
               style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF2D3748)),
             ),
             Text(
-              "Track your health and nutrition automatically",
+              "Theo dõi sức khỏe và dinh dưỡng tự động",
               style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             ),
           ],
@@ -191,7 +231,6 @@ class _DashboardTabState extends State<DashboardTab> {
   }
 
   Widget _buildDateSelector() {
-    final isToday = DateFormat('yyyy-MM-dd').format(_selectedDate) == DateFormat('yyyy-MM-dd').format(DateTime.now());
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -209,7 +248,7 @@ class _DashboardTabState extends State<DashboardTab> {
             onPressed: () => _changeDate(-1),
           ),
           Text(
-            isToday ? "Today, ${DateFormat('MMM dd').format(_selectedDate)}" : DateFormat('EEEE, MMM dd').format(_selectedDate),
+            _getFormattedDate(),
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF2D3748)),
           ),
           IconButton(
@@ -243,7 +282,7 @@ class _DashboardTabState extends State<DashboardTab> {
                     Icon(Icons.local_fire_department, color: Colors.orange[700], size: 24),
                     const SizedBox(width: 8),
                     const Text(
-                      "Calories",
+                      "Calo tiêu thụ",
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF2D3748)),
                     ),
                   ],
@@ -254,14 +293,14 @@ class _DashboardTabState extends State<DashboardTab> {
                   style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: primaryGreen),
                 ),
                 Text(
-                  "kcal consumed of ${_caloriesTarget.round()} kcal goal",
+                  "kcal đã nạp / ${_caloriesTarget.round()} kcal mục tiêu",
                   style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   remainingCalories > 0
-                      ? "${remainingCalories.round()} kcal remaining"
-                      : "Goal exceeded by ${(_caloriesConsumed - _caloriesTarget).round()} kcal!",
+                      ? "Còn lại ${remainingCalories.round()} kcal"
+                      : "Vượt quá mục tiêu ${(_caloriesConsumed - _caloriesTarget).round()} kcal!",
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -278,11 +317,18 @@ class _DashboardTabState extends State<DashboardTab> {
               SizedBox(
                 width: 110,
                 height: 110,
-                child: CircularProgressIndicator(
-                  value: caloriePercent,
-                  strokeWidth: 12,
-                  backgroundColor: Colors.grey.shade100,
-                  color: primaryGreen,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 0, end: caloriePercent),
+                  duration: const Duration(milliseconds: 1000),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, value, child) {
+                    return CircularProgressIndicator(
+                      value: value,
+                      strokeWidth: 12,
+                      backgroundColor: Colors.grey.shade100,
+                      color: primaryGreen,
+                    );
+                  },
                 ),
               ),
               Column(
@@ -293,7 +339,7 @@ class _DashboardTabState extends State<DashboardTab> {
                     style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF2D3748)),
                   ),
                   const Text(
-                    "of goal",
+                    "đạt được",
                     style: TextStyle(fontSize: 11, color: Colors.grey),
                   ),
                 ],
@@ -319,12 +365,12 @@ class _DashboardTabState extends State<DashboardTab> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            "Macronutrients Summary",
+            "Tỷ lệ dinh dưỡng",
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF2D3748)),
           ),
           const SizedBox(height: 20),
           _buildMacroRow(
-            "Protein",
+            "Chất đạm (Protein)",
             _proteinConsumed,
             _proteinTarget,
             Colors.redAccent.shade200,
@@ -332,7 +378,7 @@ class _DashboardTabState extends State<DashboardTab> {
           ),
           const SizedBox(height: 15),
           _buildMacroRow(
-            "Carbohydrates",
+            "Chất bột đường (Carbs)",
             _carbConsumed,
             _carbTarget,
             Colors.amber.shade600,
@@ -340,7 +386,7 @@ class _DashboardTabState extends State<DashboardTab> {
           ),
           const SizedBox(height: 15),
           _buildMacroRow(
-            "Fats",
+            "Chất béo (Fats)",
             _fatConsumed,
             _fatTarget,
             Colors.blue.shade400,
@@ -372,11 +418,18 @@ class _DashboardTabState extends State<DashboardTab> {
         const SizedBox(height: 8),
         ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          child: LinearProgressIndicator(
-            value: percent,
-            minHeight: 8,
-            backgroundColor: Colors.grey.shade100,
-            color: color,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: 0, end: percent),
+            duration: const Duration(milliseconds: 800),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, child) {
+              return LinearProgressIndicator(
+                value: value,
+                minHeight: 8,
+                backgroundColor: Colors.grey.shade100,
+                color: color,
+              );
+            },
           ),
         ),
       ],
@@ -419,7 +472,7 @@ class _DashboardTabState extends State<DashboardTab> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text("Water Log", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                      const Text("Nước uống", style: TextStyle(color: Colors.grey, fontSize: 12)),
                       const SizedBox(height: 4),
                       Text(
                         "${_waterConsumed.round()} / ${_waterGoal.round()} ml",
@@ -429,11 +482,18 @@ class _DashboardTabState extends State<DashboardTab> {
                   ),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: waterPercent,
-                      color: Colors.blue[600],
-                      backgroundColor: Colors.blue.shade50,
-                      minHeight: 6,
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween<double>(begin: 0, end: waterPercent),
+                      duration: const Duration(milliseconds: 800),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, child) {
+                        return LinearProgressIndicator(
+                          value: value,
+                          color: Colors.blue[600],
+                          backgroundColor: Colors.blue.shade50,
+                          minHeight: 6,
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -465,19 +525,19 @@ class _DashboardTabState extends State<DashboardTab> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text("Weight summary", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                      const Text("Cân nặng", style: TextStyle(color: Colors.grey, fontSize: 12)),
                       const SizedBox(height: 4),
                       Text(
                         _currentWeight > 0 ? "$_currentWeight kg" : "-- kg",
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                       Text(
-                        _targetWeight > 0 ? "Goal: $_targetWeight kg" : "Goal: -- kg",
+                        _targetWeight > 0 ? "Mục tiêu: $_targetWeight kg" : "Mục tiêu: -- kg",
                         style: TextStyle(color: Colors.grey[600], fontSize: 11),
                       ),
                     ],
                   ),
-                  const Text("View details", style: TextStyle(color: Colors.grey, fontSize: 11, fontStyle: FontStyle.italic)),
+                  const Text("Xem chi tiết", style: TextStyle(color: Colors.grey, fontSize: 11, fontStyle: FontStyle.italic)),
                 ],
               ),
             ),
@@ -523,12 +583,12 @@ class _DashboardTabState extends State<DashboardTab> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    "AI Nutrition Coach",
+                    "Trợ lý Dinh dưỡng AI",
                     style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17),
                   ),
                   SizedBox(height: 4),
                   Text(
-                    "Get personalized diet advice based on your data",
+                    "Nhận tư vấn dinh dưỡng cá nhân hóa dựa trên dữ liệu của bạn",
                     style: TextStyle(color: Colors.white70, fontSize: 12),
                   ),
                 ],
@@ -546,7 +606,7 @@ class _DashboardTabState extends State<DashboardTab> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          "Quick Actions",
+          "Thao tác nhanh",
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF2D3748)),
         ),
         const SizedBox(height: 15),
@@ -555,7 +615,7 @@ class _DashboardTabState extends State<DashboardTab> {
             Expanded(
               child: _buildActionBtn(
                 Icons.add_shopping_cart,
-                "Log Meal",
+                "Ghi bữa ăn",
                 Colors.green.shade50,
                 Colors.green.shade800,
                 widget.onNavigateToMeals,
@@ -565,7 +625,7 @@ class _DashboardTabState extends State<DashboardTab> {
             Expanded(
               child: _buildActionBtn(
                 Icons.opacity,
-                "Log Water",
+                "Ghi nước",
                 Colors.blue.shade50,
                 Colors.blue.shade800,
                 widget.onNavigateToWater,
@@ -575,7 +635,7 @@ class _DashboardTabState extends State<DashboardTab> {
             Expanded(
               child: _buildActionBtn(
                 Icons.add_chart,
-                "Log Weight",
+                "Ghi cân",
                 Colors.teal.shade50,
                 Colors.teal.shade800,
                 widget.onNavigateToWeight,
@@ -609,6 +669,36 @@ class _DashboardTabState extends State<DashboardTab> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class AnimatedFadeSlide extends StatelessWidget {
+  final Widget child;
+  final int delay;
+
+  const AnimatedFadeSlide({
+    super.key,
+    required this.child,
+    required this.delay,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 600 + delay),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, (1.0 - value) * 15),
+            child: child,
+          ),
+        );
+      },
+      child: child,
     );
   }
 }

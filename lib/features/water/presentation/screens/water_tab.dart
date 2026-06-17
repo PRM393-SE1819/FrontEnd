@@ -80,7 +80,7 @@ class _WaterTabState extends State<WaterTab> {
     if (res != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Logged +${amount.round()} ml of Water!"),
+          content: Text("Đã ghi nhận +${amount.round()} ml nước!"),
           backgroundColor: waterBlue,
           behavior: SnackBarBehavior.floating,
         ),
@@ -94,7 +94,7 @@ class _WaterTabState extends State<WaterTab> {
     if (success) {
       _loadWaterData();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Water log deleted"), behavior: SnackBarBehavior.floating),
+        const SnackBar(content: Text("Đã xóa nhật ký uống nước"), behavior: SnackBarBehavior.floating),
       );
     }
   }
@@ -105,17 +105,17 @@ class _WaterTabState extends State<WaterTab> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("Log Water Custom Amount"),
+        title: const Text("Ghi nhận lượng nước tùy chỉnh"),
         content: TextField(
           controller: amountController,
           decoration: const InputDecoration(
-            labelText: "Amount (ml)",
+            labelText: "Lượng nước (ml)",
             suffixText: "ml",
           ),
           keyboardType: TextInputType.number,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Hủy", style: TextStyle(color: Colors.grey))),
           ElevatedButton(
             onPressed: () {
               final amount = double.tryParse(amountController.text) ?? 250.0;
@@ -123,7 +123,7 @@ class _WaterTabState extends State<WaterTab> {
               _addWater(amount);
             },
             style: ElevatedButton.styleFrom(backgroundColor: waterBlue),
-            child: const Text("Log", style: TextStyle(color: Colors.white)),
+            child: const Text("Ghi", style: TextStyle(color: Colors.white)),
           )
         ],
       ),
@@ -136,17 +136,17 @@ class _WaterTabState extends State<WaterTab> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("Update Daily Water Goal"),
+        title: const Text("Cập nhật mục tiêu nước ngày"),
         content: TextField(
           controller: goalController,
           decoration: const InputDecoration(
-            labelText: "Daily Target Goal (ml)",
+            labelText: "Mục tiêu hàng ngày (ml)",
             suffixText: "ml",
           ),
           keyboardType: TextInputType.number,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Hủy", style: TextStyle(color: Colors.grey))),
           ElevatedButton(
             onPressed: () async {
               final target = double.tryParse(goalController.text) ?? 2000.0;
@@ -155,12 +155,12 @@ class _WaterTabState extends State<WaterTab> {
               if (res != null) {
                 _loadWaterData();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Water goal updated successfully")),
+                  const SnackBar(content: Text("Đã cập nhật mục tiêu thành công")),
                 );
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: waterBlue),
-            child: const Text("Save", style: TextStyle(color: Colors.white)),
+            child: const Text("Lưu", style: TextStyle(color: Colors.white)),
           )
         ],
       ),
@@ -181,7 +181,7 @@ class _WaterTabState extends State<WaterTab> {
       if (res != null) {
         _loadWaterData();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Water reminder added!")),
+          const SnackBar(content: Text("Đã thêm nhắc nhở uống nước!")),
         );
       }
     }
@@ -192,7 +192,7 @@ class _WaterTabState extends State<WaterTab> {
     if (success) {
       _loadWaterData();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Reminder deleted")),
+        const SnackBar(content: Text("Đã xóa nhắc nhở thành công")),
       );
     }
   }
@@ -237,14 +237,14 @@ class _WaterTabState extends State<WaterTab> {
             children: [
               Icon(Icons.local_drink, color: waterBlue, size: 28),
               const SizedBox(width: 10),
-              const Text("Drink Water!", style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text("Uống nước nào!", style: TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
-          content: Text("It's $time! Time to drink some water and stay hydrated."),
+          content: Text("Đã đến $time! Hãy uống nước để giữ cơ thể luôn đủ nước nhé."),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("Dismiss"),
+              child: const Text("Bỏ qua", style: TextStyle(color: Colors.grey)),
             ),
             ElevatedButton(
               onPressed: () {
@@ -252,7 +252,7 @@ class _WaterTabState extends State<WaterTab> {
                 _addWater(250);
               },
               style: ElevatedButton.styleFrom(backgroundColor: waterBlue),
-              child: const Text("Log 250ml", style: TextStyle(color: Colors.white)),
+              child: const Text("Uống 250ml", style: TextStyle(color: Colors.white)),
             ),
           ],
         );
@@ -273,7 +273,7 @@ class _WaterTabState extends State<WaterTab> {
       backgroundColor: const Color(0xFFF7FAFC),
       appBar: AppBar(
         title: const Text(
-          "Water Logging & Goals",
+          "Theo dõi nước uống",
           style: TextStyle(color: Color(0xFF2D3748), fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white,
@@ -285,15 +285,30 @@ class _WaterTabState extends State<WaterTab> {
               padding: const EdgeInsets.all(20.0),
               child: Column(
                 children: [
-                  _buildWaterVisualizerCard(percent),
+                  AnimatedFadeSlide(
+                    delay: 0,
+                    child: _buildWaterVisualizerCard(percent),
+                  ),
                   const SizedBox(height: 25),
-                  _buildQuickAddGrid(),
+                  AnimatedFadeSlide(
+                    delay: 100,
+                    child: _buildQuickAddGrid(),
+                  ),
                   const SizedBox(height: 25),
-                  _buildGoalCard(),
+                  AnimatedFadeSlide(
+                    delay: 150,
+                    child: _buildGoalCard(),
+                  ),
                   const SizedBox(height: 25),
-                  _buildRemindersSection(),
+                  AnimatedFadeSlide(
+                    delay: 200,
+                    child: _buildRemindersSection(),
+                  ),
                   const SizedBox(height: 25),
-                  _buildLogsHistorySection(),
+                  AnimatedFadeSlide(
+                    delay: 250,
+                    child: _buildLogsHistorySection(),
+                  ),
                 ],
               ),
             ),
@@ -313,7 +328,7 @@ class _WaterTabState extends State<WaterTab> {
       child: Column(
         children: [
           const Text(
-            "Today's Progress",
+            "Tiến độ hôm nay",
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF4A5568)),
           ),
           const SizedBox(height: 20),
@@ -323,11 +338,18 @@ class _WaterTabState extends State<WaterTab> {
               SizedBox(
                 width: 140,
                 height: 140,
-                child: CircularProgressIndicator(
-                  value: percent,
-                  strokeWidth: 14,
-                  backgroundColor: Colors.blue.shade50,
-                  color: waterBlue,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 0, end: percent),
+                  duration: const Duration(milliseconds: 1000),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, value, child) {
+                    return CircularProgressIndicator(
+                      value: value,
+                      strokeWidth: 14,
+                      backgroundColor: Colors.blue.shade50,
+                      color: waterBlue,
+                    );
+                  },
                 ),
               ),
               Column(
@@ -340,7 +362,7 @@ class _WaterTabState extends State<WaterTab> {
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: waterBlue),
                   ),
                   Text(
-                    "Target: ${_goalML.round()} ml",
+                    "Mục tiêu: ${_goalML.round()} ml",
                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                 ],
@@ -350,8 +372,8 @@ class _WaterTabState extends State<WaterTab> {
           const SizedBox(height: 20),
           Text(
             percent >= 1.0
-                ? "🎉 Fantastic job! Goal achieved!"
-                : "You need ${(_goalML - _consumedML).clamp(0, double.infinity).round()} ml more to reach your goal.",
+                ? "🎉 Tuyệt vời! Bạn đã đạt mục tiêu uống nước!"
+                : "Bạn cần uống thêm ${(_goalML - _consumedML).clamp(0, double.infinity).round()} ml để hoàn thành mục tiêu.",
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
@@ -369,15 +391,15 @@ class _WaterTabState extends State<WaterTab> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          "Quick Log Water",
+          "Ghi nhanh lượng nước",
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF2D3748)),
         ),
         const SizedBox(height: 15),
         Row(
           children: [
-            Expanded(child: _waterQuickBtn(Icons.local_cafe, "Cup", 250)),
+            Expanded(child: _waterQuickBtn(Icons.local_cafe, "Cốc nước", 250)),
             const SizedBox(width: 12),
-            Expanded(child: _waterQuickBtn(Icons.local_drink, "Bottle", 500)),
+            Expanded(child: _waterQuickBtn(Icons.local_drink, "Chai nước", 500)),
             const SizedBox(width: 12),
             Expanded(
               child: InkWell(
@@ -394,7 +416,7 @@ class _WaterTabState extends State<WaterTab> {
                     children: [
                       Icon(Icons.add, color: waterBlue, size: 28),
                       const SizedBox(height: 4),
-                      Text("Custom", style: TextStyle(fontWeight: FontWeight.bold, color: waterBlue, fontSize: 13)),
+                      Text("Tùy chỉnh", style: TextStyle(fontWeight: FontWeight.bold, color: waterBlue, fontSize: 13)),
                     ],
                   ),
                 ),
@@ -452,8 +474,8 @@ class _WaterTabState extends State<WaterTab> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("Daily Water Target", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  Text("Goal: ${_goalML.round()} ml", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  const Text("Mục tiêu nước ngày", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  Text("Mục tiêu: ${_goalML.round()} ml", style: const TextStyle(color: Colors.grey, fontSize: 12)),
                 ],
               )
             ],
@@ -465,7 +487,7 @@ class _WaterTabState extends State<WaterTab> {
               side: BorderSide(color: waterBlue),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text("Edit Goal"),
+            child: const Text("Sửa mục tiêu"),
           )
         ],
       ),
@@ -488,7 +510,7 @@ class _WaterTabState extends State<WaterTab> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text("Water Reminders", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Text("Nhắc nhở uống nước", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               IconButton(
                 icon: Icon(Icons.add_alarm, color: waterBlue),
                 onPressed: _addReminder,
@@ -497,7 +519,7 @@ class _WaterTabState extends State<WaterTab> {
           ),
           const SizedBox(height: 8),
           _reminders.isEmpty
-              ? Text("No alarms configured.", style: TextStyle(color: Colors.grey[500], fontSize: 13))
+              ? Text("Chưa cài đặt nhắc nhở nào.", style: TextStyle(color: Colors.grey[500], fontSize: 13))
               : ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -554,7 +576,7 @@ class _WaterTabState extends State<WaterTab> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("Today's Water Intake logs", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const Text("Nhật ký uống nước hôm nay", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 12),
         _logs.isEmpty
             ? Container(
@@ -562,7 +584,7 @@ class _WaterTabState extends State<WaterTab> {
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
                 child: Center(
-                  child: Text("No water logged today yet.", style: TextStyle(color: Colors.grey[400])),
+                  child: Text("Hôm nay bạn chưa ghi nhận uống nước.", style: TextStyle(color: Colors.grey[400])),
                 ),
               )
             : ListView.builder(
@@ -572,27 +594,60 @@ class _WaterTabState extends State<WaterTab> {
                 itemBuilder: (context, idx) {
                   final log = _logs[idx];
                   final logTime = DateTime.parse(log['loggedAt']).toLocal();
-                  final timeStr = DateFormat('hh:mm a').format(logTime);
+                  final timeStr = DateFormat('HH:mm').format(logTime);
                   final amt = (log['amountML'] as num?)?.toDouble() ?? 0.0;
                   final logId = log['waterLogId'];
 
-                  return Card(
-                    elevation: 0,
-                    margin: const EdgeInsets.only(bottom: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    child: ListTile(
-                      leading: Icon(Icons.local_drink, color: waterBlue),
-                      title: Text("${amt.round()} ml"),
-                      subtitle: Text(timeStr),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.grey),
-                        onPressed: () => _deleteLog(logId),
+                  return AnimatedFadeSlide(
+                    delay: (idx * 50).clamp(0, 300),
+                    child: Card(
+                      elevation: 0,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: ListTile(
+                        leading: Icon(Icons.local_drink, color: waterBlue),
+                        title: Text("${amt.round()} ml"),
+                        subtitle: Text(timeStr),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete_outline, color: Colors.grey),
+                          onPressed: () => _deleteLog(logId),
+                        ),
                       ),
                     ),
                   );
                 },
               )
       ],
+    );
+  }
+}
+
+class AnimatedFadeSlide extends StatelessWidget {
+  final Widget child;
+  final int delay;
+
+  const AnimatedFadeSlide({
+    super.key,
+    required this.child,
+    required this.delay,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 400 + delay),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, (1.0 - value) * 15),
+            child: child,
+          ),
+        );
+      },
+      child: child,
     );
   }
 }

@@ -152,8 +152,8 @@ class _MainNavigationContainerState extends State<MainNavigationContainer> {
           height: 76,
           child: Row(
             children: [
-              _navItem(0, Icons.dashboard_outlined, Icons.dashboard, "Home"),
-              _navItem(1, Icons.restaurant_menu_outlined, Icons.restaurant_menu, "Foods"),
+              _navItem(0, Icons.dashboard_outlined, Icons.dashboard, "Trang chủ"),
+              _navItem(1, Icons.restaurant_menu_outlined, Icons.restaurant_menu, "Món ăn"),
               // Center AI Coach FAB button
               Expanded(
                 child: GestureDetector(
@@ -195,7 +195,7 @@ class _MainNavigationContainerState extends State<MainNavigationContainer> {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          "AI Coach",
+                          "Trợ lý AI",
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -209,8 +209,8 @@ class _MainNavigationContainerState extends State<MainNavigationContainer> {
                   ),
                 ),
               ),
-              _navItem(3, Icons.event_note_outlined, Icons.event_note, "Meals"),
-              _navItem(4, Icons.local_drink_outlined, Icons.local_drink, "Water"),
+              _navItem(3, Icons.event_note_outlined, Icons.event_note, "Bữa ăn"),
+              _navItem(4, Icons.local_drink_outlined, Icons.local_drink, "Nước"),
             ],
           ),
         ),
@@ -229,20 +229,38 @@ class _MainNavigationContainerState extends State<MainNavigationContainer> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                isActive ? activeIcon : icon,
-                color: isActive ? primaryGreen : Colors.grey[500],
-                size: 24,
+              AnimatedScale(
+                scale: isActive ? 1.15 : 1.0,
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOutBack,
+                child: Icon(
+                  isActive ? activeIcon : icon,
+                  color: isActive ? primaryGreen : Colors.grey[500],
+                  size: 24,
+                ),
               ),
               const SizedBox(height: 3),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 200),
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
                   color: isActive ? primaryGreen : Colors.grey[500],
+                ),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(height: 2),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: isActive ? 5 : 0,
+                height: isActive ? 5 : 0,
+                decoration: const BoxDecoration(
+                  color: primaryGreen,
+                  shape: BoxShape.circle,
                 ),
               ),
             ],
