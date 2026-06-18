@@ -218,7 +218,7 @@ class _DashboardTabState extends State<DashboardTab> {
             color: Colors.white,
             shape: BoxShape.circle,
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))
+              BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))
             ],
           ),
           child: IconButton(
@@ -237,7 +237,7 @@ class _DashboardTabState extends State<DashboardTab> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))
+          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))
         ],
       ),
       child: Row(
@@ -267,7 +267,7 @@ class _DashboardTabState extends State<DashboardTab> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 15, offset: const Offset(0, 8))
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 15, offset: const Offset(0, 8))
         ],
       ),
       child: Row(
@@ -358,7 +358,7 @@ class _DashboardTabState extends State<DashboardTab> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 15, offset: const Offset(0, 8))
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 15, offset: const Offset(0, 8))
         ],
       ),
       child: Column(
@@ -405,12 +405,16 @@ class _DashboardTabState extends State<DashboardTab> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              title,
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF4A5568)),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF4A5568)),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
+            const SizedBox(width: 8),
             Text(
-              "${consumed.round()}/$target $unit (${(percent * 100).round()}%)",
+              "${consumed.round()}/${target.round()} $unit (${(percent * 100).round()}%)",
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF2D3748)),
             ),
           ],
@@ -452,7 +456,7 @@ class _DashboardTabState extends State<DashboardTab> {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))
                 ],
               ),
               child: Column(
@@ -514,7 +518,7 @@ class _DashboardTabState extends State<DashboardTab> {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))
                 ],
               ),
               child: Column(

@@ -215,6 +215,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
     if (text.isEmpty || _isLoading) return;
 
     _messageController.clear();
+    FocusScope.of(context).unfocus(); // Dismiss the keyboard
     setState(() {
       _messages.add(_ChatMessage(text: text, isUser: true, timestamp: DateTime.now()));
       _isLoading = true;
@@ -1282,6 +1283,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
 
   Future<void> _estimateCaloriesFromText(String description) async {
     if (description.trim().isEmpty) return;
+    FocusScope.of(context).unfocus(); // Dismiss the keyboard
     _showLoadingDialog("Đang ước tính calo...");
     final res = await ApiService.estimateCalories(description.trim());
     if (mounted) Navigator.pop(context);

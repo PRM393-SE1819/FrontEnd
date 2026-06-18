@@ -322,7 +322,7 @@ class _WaterTabState extends State<WaterTab> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))
+          BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))
         ],
       ),
       child: Column(
@@ -408,7 +408,7 @@ class _WaterTabState extends State<WaterTab> {
                 child: Container(
                   height: 90,
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
+                    color: waterBlue.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Column(
@@ -438,7 +438,7 @@ class _WaterTabState extends State<WaterTab> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2))
+            BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 8, offset: const Offset(0, 2))
           ],
         ),
         child: Column(
@@ -461,33 +461,46 @@ class _WaterTabState extends State<WaterTab> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))
+          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))
         ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              Icon(Icons.track_changes, color: waterBlue),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text("Mục tiêu nước ngày", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  Text("Mục tiêu: ${_goalML.round()} ml", style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                ],
-              )
-            ],
+          Expanded(
+            child: Row(
+              children: [
+                Icon(Icons.track_changes, color: waterBlue),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Mục tiêu nước ngày",
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        "Mục tiêu: ${_goalML.round()} ml",
+                        style: const TextStyle(color: Colors.grey, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
+          const SizedBox(width: 8),
           OutlinedButton(
             onPressed: _openUpdateGoalDialog,
             style: OutlinedButton.styleFrom(
               foregroundColor: waterBlue,
               side: BorderSide(color: waterBlue),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
             ),
-            child: const Text("Sửa mục tiêu"),
+            child: const Text("Sửa mục tiêu", style: TextStyle(fontSize: 13)),
           )
         ],
       ),
@@ -501,7 +514,7 @@ class _WaterTabState extends State<WaterTab> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))
+          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))
         ],
       ),
       child: Column(
