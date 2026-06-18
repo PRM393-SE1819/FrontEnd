@@ -37,6 +37,7 @@ class NutriAIApp extends StatelessWidget {
       title: 'NutriAI',
       theme: ThemeData(
         useMaterial3: true,
+        fontFamily: 'Roboto',
         primaryColor: const Color(0xFF006D44),
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF006D44),

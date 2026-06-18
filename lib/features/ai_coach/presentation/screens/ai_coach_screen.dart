@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/network/api_service.dart';
+import '../../../meal/presentation/screens/meal_tab.dart';
 
 class AiCoachScreen extends StatefulWidget {
   const AiCoachScreen({super.key});
@@ -46,6 +47,40 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
     try {
       final nutrition = await ApiService.getDailyNutritionSummary(today);
       final weight = await ApiService.getWeightSummary();
+      final profile = await ApiService.getHealthProfile();
+      final conditions = await ApiService.getHealthConditions() ?? [];
+      final allergies = await ApiService.getAllergies() ?? [];
+      final waterSummary = await ApiService.getDailyWaterSummary(today);
+      final mealHistory = await ApiService.getMealHistory(date: today);
+
+      String conditionsStr = conditions.isEmpty
+          ? "Không có"
+          : conditions.map((c) {
+              final name = c['conditionName'] ?? '';
+              final notes = c['notes'] ?? '';
+              return notes.toString().isNotEmpty ? "$name ($notes)" : name;
+            }).join(", ");
+
+      String allergiesStr = allergies.isEmpty
+          ? "Không có"
+          : allergies.map((a) => a['allergyName'] ?? '').join(", ");
+
+      String mealsListStr = "Chưa có bữa ăn nào được ghi nhận hôm nay.";
+      if (mealHistory != null && mealHistory['items'] != null) {
+        final List<dynamic> items = mealHistory['items'];
+        if (items.isNotEmpty) {
+          final List<String> mealStrings = [];
+          for (var m in items) {
+            final type = m['mealType'] ?? 'Bữa ăn';
+            final totalCal = (m['totalCalories'] as num?)?.round() ?? 0;
+            final List<dynamic> foodItems = m['items'] ?? [];
+            final foodDetails = foodItems.map((f) => "${f['foodName']} (${(f['quantity'] as num).round()}g)").join(", ");
+            mealStrings.add("- $type ($totalCal kcal): $foodDetails");
+          }
+          mealsListStr = mealStrings.join("\n");
+        }
+      }
+
       setState(() {
         _userContext = {
           'calories': (nutrition?['caloriesConsumed'] as num?)?.round() ?? 0,
@@ -57,10 +92,29 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
           'fat': (nutrition?['fatConsumed'] as num?)?.toStringAsFixed(1) ?? '0',
           'fatTarget': (nutrition?['fatTarget'] as num?)?.round() ?? 70,
           'weight': (weight?['currentWeight'] as num?)?.toString() ?? 'N/A',
+          
+          'gender': profile?['gender'] ?? 'N/A',
+          'dateOfBirth': profile?['dateOfBirth'] ?? 'N/A',
+          'age': profile?['dateOfBirth'] != null 
+              ? (DateTime.now().year - DateTime.parse(profile!['dateOfBirth']).year).toString()
+              : 'N/A',
+          'height': profile?['height']?.toString() ?? 'N/A',
+          'activityLevel': profile?['activityLevel'] ?? 'N/A',
+          'goal': profile?['goal'] ?? 'N/A',
+          'targetWeight': profile?['targetWeight']?.toString() ?? 'N/A',
+          'bmi': profile?['bmi']?.toStringAsFixed(1) ?? 'N/A',
+          'bodyFat': profile?['bodyFat']?.toStringAsFixed(1) ?? 'N/A',
+          'conditions': conditionsStr,
+          'allergies': allergiesStr,
+          'waterConsumed': (waterSummary?['consumedML'] as num?)?.round() ?? 0,
+          'waterGoal': (waterSummary?['goalML'] as num?)?.round() ?? 2000,
+          'mealsList': mealsListStr,
+          'todayDate': today,
         };
         _isContextLoading = false;
       });
     } catch (e) {
+      if (kDebugMode) print("Error loading user context for AI Coach: $e");
       setState(() => _isContextLoading = false);
     }
 
@@ -1139,6 +1193,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
         // 1. Search food
         final searchResult = await ApiService.searchFoods(foodName);
         int? foodId;
+        String? servingSize;
 
         if (searchResult != null && searchResult['items'] != null && (searchResult['items'] as List).isNotEmpty) {
           final results = searchResult['items'] as List;
@@ -1147,6 +1202,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
             orElse: () => results.first,
           );
           foodId = match['foodId'];
+          servingSize = match['servingSize']?.toString();
         }
 
         // 2. Create custom food if not found
@@ -1157,6 +1213,8 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
           final carbs = (nutrition['carbs'] as num?)?.toDouble() ?? 0.0;
           final fat = (nutrition['fat'] as num?)?.toDouble() ?? 0.0;
           
+          servingSize = weight > 0 ? "${weight.round()}g" : (item['portion_size'] ?? "100g");
+
           final customFood = await ApiService.createCustomFood({
             "name": foodName,
             "description": "Nhận diện từ AI Scan",
@@ -1164,7 +1222,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
             "protein": protein,
             "carbs": carbs,
             "fat": fat,
-            "servingSize": item['portion_size'] ?? "100g",
+            "servingSize": servingSize,
           });
 
           if (customFood != null) {
@@ -1173,9 +1231,11 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
         }
 
         if (foodId != null) {
+          final servingWeight = parseServingWeight(servingSize);
+          final quantityToSend = quantity / servingWeight;
           mealItems.add({
             "foodId": foodId,
-            "quantity": quantity,
+            "quantity": quantityToSend,
           });
         }
       }
@@ -1194,6 +1254,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
 
         if (res != null) {
           _loadUserContext(); // Update context values on UI
+          MealTab.onReload?.call();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text("Đã lưu vào nhật ký $mealType thành công!"),
@@ -2634,5 +2695,16 @@ class AnimatedFadeSlide extends StatelessWidget {
       child: child,
     );
   }
+}
+
+double parseServingWeight(String? servingSize) {
+  if (servingSize == null || servingSize.isEmpty) return 100.0;
+  final regExp = RegExp(r'([0-9]+(?:\.[0-9]+)?)');
+  final match = regExp.firstMatch(servingSize);
+  if (match != null) {
+    final parsed = double.tryParse(match.group(1) ?? '');
+    if (parsed != null && parsed > 0) return parsed;
+  }
+  return 1.0; // Fallback to 1 (e.g. "portion", "serving", "phần", "cái")
 }
 

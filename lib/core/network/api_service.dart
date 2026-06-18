@@ -843,6 +843,38 @@ class ApiService {
 
       if (kDebugMode) print("Sending Chat Request to Backend: $url");
 
+      String finalMessage = userMessage;
+      if (userContext != null && userContext.isNotEmpty) {
+        finalMessage = """
+[BỐI CẢNH DINH DƯỠNG & SỨC KHỎE CỦA TÔI]
+- Giới tính: ${userContext['gender'] ?? 'N/A'}
+- Ngày sinh: ${userContext['dateOfBirth'] ?? 'N/A'} (Tuổi: ${userContext['age'] ?? 'N/A'})
+- Chiều cao: ${userContext['height'] ?? 'N/A'} cm
+- Cân nặng: ${userContext['weight'] ?? 'N/A'} kg
+- Mức độ hoạt động: ${userContext['activityLevel'] ?? 'N/A'}
+- Mục tiêu: ${userContext['goal'] ?? 'N/A'} (Cân nặng đích: ${userContext['targetWeight'] ?? 'N/A'} kg)
+- Chỉ số BMI: ${userContext['bmi'] ?? 'N/A'} | Tỷ lệ mỡ: ${userContext['bodyFat'] ?? 'N/A'}%
+- Bệnh lý nền: ${userContext['conditions'] ?? 'Không có'}
+- Dị ứng thức ăn: ${userContext['allergies'] ?? 'Không có'}
+
+[NHẬT KÝ HÔM NAY - Ngày ${userContext['todayDate'] ?? ''}]
+- Nước uống: ${userContext['waterConsumed'] ?? 0} ml / ${userContext['waterGoal'] ?? 2000} ml
+- Calo tiêu thụ: ${userContext['calories'] ?? 0} kcal / ${userContext['calorieTarget'] ?? 2000} kcal
+- Macro nạp/Mục tiêu: Đạm: ${userContext['protein'] ?? 0}g / ${userContext['proteinTarget'] ?? 150}g | Tinh bột: ${userContext['carbs'] ?? 0}g / ${userContext['carbTarget'] ?? 250}g | Chất béo: ${userContext['fat'] ?? 0}g / ${userContext['fatTarget'] ?? 70}g
+- Các món đã ăn hôm nay:
+${userContext['mealsList'] ?? 'Chưa ghi nhận bữa ăn nào.'}
+
+[HƯỚNG DẪN DÀNH CHO AI]
+- Bạn là một Trợ lý Dinh dưỡng AI chuyên nghiệp.
+- Hãy dựa vào [BỐI CẢNH DINH DƯỠNG & SỨC KHỎE CỦA TÔI] và [NHẬT KÝ HÔM NAY] ở trên để tư vấn, phân tích và đưa ra kế hoạch ăn uống/uống nước cá nhân hóa cho tôi.
+- Trả lời bằng tiếng Việt một cách tự nhiên, chuyên nghiệp và thân thiện.
+- Nếu tôi hỏi về kế hoạch hoặc gợi ý thực đơn, hãy thiết kế các bữa ăn cụ thể phù hợp với mục tiêu, chiều cao, cân nặng, cấp độ hoạt động và tránh các thực phẩm tôi bị dị ứng hoặc không tốt cho bệnh nền của tôi.
+
+[CÂU HỎI CỦA NGƯỜI DÙNG]
+$userMessage
+""";
+      }
+
       final response = await http.post(
         url,
         headers: {
@@ -850,7 +882,7 @@ class ApiService {
           if (token != null) "Authorization": "Bearer $token",
         },
         body: jsonEncode({
-          "message": userMessage,
+          "message": finalMessage,
         }),
       );
 

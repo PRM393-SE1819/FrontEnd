@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/network/api_service.dart';
+import '../../../meal/presentation/screens/meal_tab.dart';
 
 class FoodTab extends StatefulWidget {
   const FoodTab({super.key});
@@ -315,7 +316,7 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
 
   void _showAddToMealDialog(Map<String, dynamic> food) {
     String selectedMealType = 'Breakfast';
-    final quantityController = TextEditingController(text: "100");
+    final quantityController = TextEditingController(text: "1");
     DateTime selectedTime = DateTime.now();
 
     showDialog(
@@ -351,9 +352,9 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
                   TextField(
                     controller: quantityController,
                     decoration: InputDecoration(
-                      labelText: "Số lượng (g / khẩu phần)",
+                      labelText: "Số lượng (Khẩu phần chuẩn: ${food['servingSize'] ?? '1 phần'})",
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      suffixText: "g",
+                      suffixText: "khẩu phần",
                     ),
                     keyboardType: TextInputType.number,
                   ),
@@ -366,7 +367,8 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    final qty = double.tryParse(quantityController.text) ?? 100.0;
+                    final qty = double.tryParse(quantityController.text) ?? 1.0;
+
                     final mealData = {
                       "mealType": selectedMealType,
                       "mealDate": selectedTime.toIso8601String(),
@@ -392,6 +394,7 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
                     }
 
                     if (res != null) {
+                      MealTab.onReload?.call();
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text("Đã thêm món ăn vào ${mealTypeMap[selectedMealType]}!"),
@@ -1095,4 +1098,15 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog> with Single
       ),
     );
   }
+}
+
+double parseServingWeight(String? servingSize) {
+  if (servingSize == null || servingSize.isEmpty) return 100.0;
+  final regExp = RegExp(r'([0-9]+(?:\.[0-9]+)?)');
+  final match = regExp.firstMatch(servingSize);
+  if (match != null) {
+    final parsed = double.tryParse(match.group(1) ?? '');
+    if (parsed != null && parsed > 0) return parsed;
+  }
+  return 1.0; // Fallback to 1 (e.g. "portion", "serving", "phần", "cái")
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../../di/dependency_injection.dart';
 import '../../../../routes/main_navigation.dart';
+import '../../../../core/network/api_service.dart';
 import '../../domain/repositories/auth_repository.dart';
 import 'register_screen.dart';
 import 'reset_password_screen.dart';
@@ -95,6 +96,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
         await _storage.write(key: 'jwt_token', value: token);
         await _storage.write(key: 'user_name', value: name);
+
+        // Synchronize pending health profile from wizard setup
+        await _syncPendingProfile();
+
         if (!mounted) return;
 
         final bool isAdmin = _isAdminToken(token);
@@ -465,5 +470,156 @@ class _LoginScreenState extends State<LoginScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _syncPendingProfile() async {
+    final pendingData = await _storage.read(key: 'pending_profile_data');
+    if (pendingData == null) return;
+
+    if (!mounted) return;
+
+    // Show the synchronized setup loading overlay
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const _ProfileSyncOverlay(),
+    );
+
+    try {
+      final data = jsonDecode(pendingData);
+
+      // 1. Sync Health Profile
+      final profile = data['profile'];
+      if (profile != null) {
+        await ApiService.updateHealthProfile(profile);
+      }
+
+      // 2. Sync Conditions
+      final List<dynamic>? conditions = data['conditions'];
+      if (conditions != null) {
+        for (var cond in conditions) {
+          final name = cond['conditionName'];
+          final notes = cond['notes'] ?? '';
+          await ApiService.addHealthCondition(name, notes);
+        }
+      }
+
+      // 3. Sync Allergies
+      final List<dynamic>? allergies = data['allergies'];
+      if (allergies != null) {
+        for (var allergy in allergies) {
+          final name = allergy['allergyName'];
+          await ApiService.addAllergy(name, '');
+        }
+      }
+
+      // Clear cached pending setup data
+      await _storage.delete(key: 'pending_profile_data');
+    } catch (e) {
+      debugPrint("Error syncing pending health profile: $e");
+    } finally {
+      if (mounted) {
+        Navigator.pop(context); // Dismiss loading dialog
+      }
+    }
+  }
+}
+
+class _ProfileSyncOverlay extends StatefulWidget {
+  const _ProfileSyncOverlay();
+
+  @override
+  State<_ProfileSyncOverlay> createState() => _ProfileSyncOverlayState();
+}
+
+class _ProfileSyncOverlayState extends State<_ProfileSyncOverlay> {
+  double _progress = 0.1;
+  String _message = "Initializing profile synchronization...";
+
+  @override
+  void initState() {
+    super.initState();
+    _startAnimation();
+  }
+
+  void _startAnimation() async {
+    final steps = [
+      (0.3, "Analyzing your physical metrics..."),
+      (0.55, "Applying activity and target parameters..."),
+      (0.70, "Creating personalised meal plan..."),
+      (0.85, "Calculating the calorie intake..."),
+      (0.95, "Configuring AI nutrition assistant..."),
+      (1.0, "Ready! Welcome aboard."),
+    ];
+
+    for (var step in steps) {
+      if (!mounted) return;
+      await Future.delayed(const Duration(milliseconds: 700));
+      if (!mounted) return;
+      setState(() {
+        _progress = step.$1;
+        _message = step.$2;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: Container(
+        padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 25,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: 100,
+                  height: 100,
+                  child: CircularProgressIndicator(
+                    value: _progress,
+                    strokeWidth: 8,
+                    backgroundColor: Colors.green.shade50,
+                    color: const Color(0xFF006D44),
+                  ),
+                ),
+                Text(
+                  "${(_progress * 100).round()}%",
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2D3748),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 25),
+            Text(
+              _message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF4A5568),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
