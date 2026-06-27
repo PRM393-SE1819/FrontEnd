@@ -400,9 +400,16 @@ class _LoginScreenState extends State<LoginScreen> {
                         Row(
                           children: [
                             Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 10),
-                              child: Text("or continue with", style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+                            Flexible(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                child: Text(
+                                  "or continue with",
+                                  style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
                             ),
                             Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
                           ],

@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/network/api_service.dart';
+import '../cubit/dashboard_cubit.dart';
+import '../cubit/dashboard_state.dart';
+import '../../domain/entities/dashboard_summary.dart';
 
 class DashboardTab extends StatefulWidget {
   final VoidCallback onNavigateToMeals;
   final VoidCallback onNavigateToWater;
   final VoidCallback onNavigateToWeight;
   final VoidCallback onNavigateToAiCoach;
+
   const DashboardTab({
     super.key,
     required this.onNavigateToMeals,
@@ -20,27 +24,6 @@ class DashboardTab extends StatefulWidget {
 }
 
 class _DashboardTabState extends State<DashboardTab> {
-  bool _isLoading = true;
-  DateTime _selectedDate = DateTime.now();
-
-  // Dashboard Data
-  double _caloriesConsumed = 0;
-  double _caloriesTarget = 2000;
-  double _proteinConsumed = 0;
-  double _proteinTarget = 150;
-  double _carbConsumed = 0;
-  double _carbTarget = 250;
-  double _fatConsumed = 0;
-  double _fatTarget = 70;
-
-  // Water data snapshot
-  double _waterConsumed = 0;
-  double _waterGoal = 2000;
-
-  // Weight data snapshot
-  double _currentWeight = 0;
-  double _targetWeight = 0;
-
   final Color primaryGreen = const Color(0xFF006D44);
   final Color secondaryAccent = const Color(0xFF319795);
   final Color bgGradientStart = const Color(0xFFF0FDF4);
@@ -49,60 +32,15 @@ class _DashboardTabState extends State<DashboardTab> {
   @override
   void initState() {
     super.initState();
-    _loadDashboardData();
-  }
-
-  Future<void> _loadDashboardData() async {
-    setState(() => _isLoading = true);
-    final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
-
-    try {
-      // 1. Get Daily Nutrition Summary
-      final nutritionSummary = await ApiService.getDailyNutritionSummary(dateStr);
-      if (nutritionSummary != null) {
-        _caloriesConsumed = (nutritionSummary['caloriesConsumed'] as num?)?.toDouble() ?? 0.0;
-        _caloriesTarget = (nutritionSummary['caloriesTarget'] as num?)?.toDouble() ?? 2000.0;
-        _proteinConsumed = (nutritionSummary['proteinConsumed'] as num?)?.toDouble() ?? 0.0;
-        _proteinTarget = (nutritionSummary['proteinTarget'] as num?)?.toDouble() ?? 150.0;
-        _carbConsumed = (nutritionSummary['carbConsumed'] as num?)?.toDouble() ?? 0.0;
-        _carbTarget = (nutritionSummary['carbTarget'] as num?)?.toDouble() ?? 250.0;
-        _fatConsumed = (nutritionSummary['fatConsumed'] as num?)?.toDouble() ?? 0.0;
-        _fatTarget = (nutritionSummary['fatTarget'] as num?)?.toDouble() ?? 70.0;
-      }
-
-      // 2. Get Daily Water Summary
-      final waterSummary = await ApiService.getDailyWaterSummary(dateStr);
-      if (waterSummary != null) {
-        _waterConsumed = (waterSummary['consumedML'] as num?)?.toDouble() ?? 0.0;
-        _waterGoal = (waterSummary['goalML'] as num?)?.toDouble() ?? 2000.0;
-      }
-
-      // 3. Get Weight Summary
-      final weightSummary = await ApiService.getWeightSummary();
-      if (weightSummary != null) {
-        _currentWeight = (weightSummary['currentWeight'] as num?)?.toDouble() ?? 0.0;
-        _targetWeight = (weightSummary['targetWeight'] as num?)?.toDouble() ?? 0.0;
-      }
-    } catch (e) {
-      debugPrint("Error loading dashboard data: $e");
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  void _changeDate(int days) {
-    setState(() {
-      _selectedDate = _selectedDate.add(Duration(days: days));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<DashboardCubit>().loadDashboardData();
     });
-    _loadDashboardData();
   }
 
-  String _getFormattedDate() {
-    final isToday = DateFormat('yyyy-MM-dd').format(_selectedDate) == DateFormat('yyyy-MM-dd').format(DateTime.now());
+  String _getFormattedDate(DateTime date) {
+    final isToday = DateFormat('yyyy-MM-dd').format(date) == DateFormat('yyyy-MM-dd').format(DateTime.now());
     if (isToday) {
-      return "Hôm nay, ${DateFormat('dd/MM').format(_selectedDate)}";
+      return "Hôm nay, ${DateFormat('dd/MM').format(date)}";
     }
     final weekdayMap = {
       'Monday': 'Thứ Hai',
@@ -113,16 +51,13 @@ class _DashboardTabState extends State<DashboardTab> {
       'Saturday': 'Thứ Bảy',
       'Sunday': 'Chủ Nhật',
     };
-    final englishDay = DateFormat('EEEE').format(_selectedDate);
+    final englishDay = DateFormat('EEEE').format(date);
     final vietnameseDay = weekdayMap[englishDay] ?? englishDay;
-    return "$vietnameseDay, ${DateFormat('dd/MM').format(_selectedDate)}";
+    return "$vietnameseDay, ${DateFormat('dd/MM').format(date)}";
   }
 
   @override
   Widget build(BuildContext context) {
-    final caloriePercent = _caloriesTarget > 0 ? (_caloriesConsumed / _caloriesTarget).clamp(0.0, 1.0) : 0.0;
-    final remainingCalories = (_caloriesTarget - _caloriesConsumed).clamp(0.0, double.infinity);
-
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
@@ -133,47 +68,81 @@ class _DashboardTabState extends State<DashboardTab> {
           ),
         ),
         child: SafeArea(
-          child: RefreshIndicator(
-            onRefresh: _loadDashboardData,
-            color: primaryGreen,
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AnimatedFadeSlide(
-                    delay: 0,
-                    child: _buildHeader(),
+          child: BlocBuilder<DashboardCubit, DashboardState>(
+            builder: (context, state) {
+              if (state is DashboardInitial || state is DashboardLoading) {
+                return Center(
+                  child: CircularProgressIndicator(color: primaryGreen),
+                );
+              }
+
+              if (state is DashboardError) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline, size: 60, color: Colors.redAccent),
+                        const SizedBox(height: 12),
+                        Text(
+                          state.message,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 16, color: Colors.grey),
+                        ),
+                        const SizedBox(height: 20),
+                        ElevatedButton(
+                          onPressed: () => context.read<DashboardCubit>().loadDashboardData(),
+                          style: ElevatedButton.styleFrom(backgroundColor: primaryGreen),
+                          child: const Text("Tải lại", style: TextStyle(color: Colors.white)),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 20),
-                  AnimatedFadeSlide(
-                    delay: 50,
-                    child: _buildDateSelector(),
-                  ),
-                  const SizedBox(height: 25),
-                  _isLoading
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(50.0),
-                            child: CircularProgressIndicator(color: primaryGreen),
-                          ),
-                        )
-                      : Column(
+                );
+              }
+
+              if (state is DashboardLoaded) {
+                final summary = state.summary;
+                final caloriePercent = summary.caloriesTarget > 0 
+                    ? (summary.caloriesConsumed / summary.caloriesTarget).clamp(0.0, 1.0) 
+                    : 0.0;
+                final remainingCalories = (summary.caloriesTarget - summary.caloriesConsumed).clamp(0.0, double.infinity);
+
+                return RefreshIndicator(
+                  onRefresh: () => context.read<DashboardCubit>().loadDashboardData(showLoading: false),
+                  color: primaryGreen,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AnimatedFadeSlide(
+                          delay: 0,
+                          child: _buildHeader(context),
+                        ),
+                        const SizedBox(height: 20),
+                        AnimatedFadeSlide(
+                          delay: 50,
+                          child: _buildDateSelector(context, state.selectedDate),
+                        ),
+                        const SizedBox(height: 25),
+                        Column(
                           children: [
                             AnimatedFadeSlide(
                               delay: 100,
-                              child: _buildCalorieCard(caloriePercent, remainingCalories),
+                              child: _buildCalorieCard(summary, caloriePercent, remainingCalories),
                             ),
                             const SizedBox(height: 20),
                             AnimatedFadeSlide(
                               delay: 150,
-                              child: _buildMacrosCard(),
+                              child: _buildMacrosCard(summary),
                             ),
                             const SizedBox(height: 20),
                             AnimatedFadeSlide(
                               delay: 200,
-                              child: _buildWaterWeightRow(),
+                              child: _buildWaterWeightRow(summary),
                             ),
                             const SizedBox(height: 20),
                             AnimatedFadeSlide(
@@ -187,16 +156,21 @@ class _DashboardTabState extends State<DashboardTab> {
                             ),
                           ],
                         ),
-                ],
-              ),
-            ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              return const SizedBox.shrink();
+            },
           ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -223,14 +197,14 @@ class _DashboardTabState extends State<DashboardTab> {
           ),
           child: IconButton(
             icon: Icon(Icons.refresh, color: primaryGreen),
-            onPressed: _loadDashboardData,
+            onPressed: () => context.read<DashboardCubit>().loadDashboardData(),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildDateSelector() {
+  Widget _buildDateSelector(BuildContext context, DateTime selectedDate) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -245,22 +219,22 @@ class _DashboardTabState extends State<DashboardTab> {
         children: [
           IconButton(
             icon: const Icon(Icons.chevron_left, color: Colors.grey),
-            onPressed: () => _changeDate(-1),
+            onPressed: () => context.read<DashboardCubit>().changeDate(-1),
           ),
           Text(
-            _getFormattedDate(),
+            _getFormattedDate(selectedDate),
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF2D3748)),
           ),
           IconButton(
             icon: const Icon(Icons.chevron_right, color: Colors.grey),
-            onPressed: () => _changeDate(1),
+            onPressed: () => context.read<DashboardCubit>().changeDate(1),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCalorieCard(double caloriePercent, double remainingCalories) {
+  Widget _buildCalorieCard(DashboardSummary summary, double caloriePercent, double remainingCalories) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -289,18 +263,18 @@ class _DashboardTabState extends State<DashboardTab> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  "${_caloriesConsumed.round()}",
+                  "${summary.caloriesConsumed.round()}",
                   style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: primaryGreen),
                 ),
                 Text(
-                  "kcal đã nạp / ${_caloriesTarget.round()} kcal mục tiêu",
+                  "kcal đã nạp / ${summary.caloriesTarget.round()} kcal mục tiêu",
                   style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   remainingCalories > 0
                       ? "Còn lại ${remainingCalories.round()} kcal"
-                      : "Vượt quá mục tiêu ${(_caloriesConsumed - _caloriesTarget).round()} kcal!",
+                      : "Vượt quá mục tiêu ${(summary.caloriesConsumed - summary.caloriesTarget).round()} kcal!",
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -351,7 +325,7 @@ class _DashboardTabState extends State<DashboardTab> {
     );
   }
 
-  Widget _buildMacrosCard() {
+  Widget _buildMacrosCard(DashboardSummary summary) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -371,24 +345,24 @@ class _DashboardTabState extends State<DashboardTab> {
           const SizedBox(height: 20),
           _buildMacroRow(
             "Chất đạm (Protein)",
-            _proteinConsumed,
-            _proteinTarget,
+            summary.proteinConsumed,
+            summary.proteinTarget,
             Colors.redAccent.shade200,
             "g",
           ),
           const SizedBox(height: 15),
           _buildMacroRow(
             "Chất bột đường (Carbs)",
-            _carbConsumed,
-            _carbTarget,
+            summary.carbConsumed,
+            summary.carbTarget,
             Colors.amber.shade600,
             "g",
           ),
           const SizedBox(height: 15),
           _buildMacroRow(
             "Chất béo (Fats)",
-            _fatConsumed,
-            _fatTarget,
+            summary.fatConsumed,
+            summary.fatTarget,
             Colors.blue.shade400,
             "g",
           ),
@@ -440,11 +414,10 @@ class _DashboardTabState extends State<DashboardTab> {
     );
   }
 
-  Widget _buildWaterWeightRow() {
-    final waterPercent = _waterGoal > 0 ? (_waterConsumed / _waterGoal).clamp(0.0, 1.0) : 0.0;
+  Widget _buildWaterWeightRow(DashboardSummary summary) {
+    final waterPercent = summary.waterGoal > 0 ? (summary.waterConsumed / summary.waterGoal).clamp(0.0, 1.0) : 0.0;
     return Row(
       children: [
-        // Water summary card
         Expanded(
           child: InkWell(
             onTap: widget.onNavigateToWater,
@@ -479,7 +452,7 @@ class _DashboardTabState extends State<DashboardTab> {
                       const Text("Nước uống", style: TextStyle(color: Colors.grey, fontSize: 12)),
                       const SizedBox(height: 4),
                       Text(
-                        "${_waterConsumed.round()} / ${_waterGoal.round()} ml",
+                        "${summary.waterConsumed.round()} / ${summary.waterGoal.round()} ml",
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                       ),
                     ],
@@ -506,7 +479,6 @@ class _DashboardTabState extends State<DashboardTab> {
           ),
         ),
         const SizedBox(width: 15),
-        // Weight progress summary card
         Expanded(
           child: InkWell(
             onTap: widget.onNavigateToWeight,
@@ -532,11 +504,11 @@ class _DashboardTabState extends State<DashboardTab> {
                       const Text("Cân nặng", style: TextStyle(color: Colors.grey, fontSize: 12)),
                       const SizedBox(height: 4),
                       Text(
-                        _currentWeight > 0 ? "$_currentWeight kg" : "-- kg",
+                        summary.currentWeight > 0 ? "${summary.currentWeight} kg" : "-- kg",
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                       Text(
-                        _targetWeight > 0 ? "Mục tiêu: $_targetWeight kg" : "Mục tiêu: -- kg",
+                        summary.targetWeight > 0 ? "Mục tiêu: ${summary.targetWeight} kg" : "Mục tiêu: -- kg",
                         style: TextStyle(color: Colors.grey[600], fontSize: 11),
                       ),
                     ],

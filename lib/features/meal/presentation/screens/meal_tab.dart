@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/network/api_service.dart';
+import '../cubit/meal_cubit.dart';
+import '../cubit/meal_state.dart';
+import '../../domain/entities/meal.dart';
+import '../../domain/entities/food.dart';
 
 class MealTab extends StatefulWidget {
   const MealTab({super.key});
@@ -12,20 +16,6 @@ class MealTab extends StatefulWidget {
 }
 
 class _MealTabState extends State<MealTab> {
-  DateTime _selectedDate = DateTime.now();
-  bool _isLoading = false;
-
-  // Daily Summary data
-  double _caloriesConsumed = 0;
-  double _caloriesTarget = 2000;
-  double _protein = 0;
-  double _carbs = 0;
-  double _fat = 0;
-  double _remaining = 2000;
-
-  // Meals list
-  List<dynamic> _meals = [];
-
   final Color primaryGreen = const Color(0xFF006D44);
   final Color secondaryGreen = const Color(0xFFE6FFFA);
 
@@ -39,59 +29,27 @@ class _MealTabState extends State<MealTab> {
   @override
   void initState() {
     super.initState();
-    MealTab.onReload = _loadMealLogs;
-    _loadMealLogs();
+    final cubit = context.read<MealCubit>();
+    MealTab.onReload = () {
+      if (cubit.state is MealLoaded) {
+        cubit.loadMealLogs((cubit.state as MealLoaded).selectedDate);
+      } else {
+        cubit.loadMealLogs(DateTime.now());
+      }
+    };
+    cubit.loadMealLogs(DateTime.now());
   }
 
   @override
   void dispose() {
-    if (MealTab.onReload == _loadMealLogs) {
-      MealTab.onReload = null;
-    }
+    MealTab.onReload = null;
     super.dispose();
   }
 
-  Future<void> _loadMealLogs() async {
-    setState(() => _isLoading = true);
-    final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
-
-    try {
-      // 1. Get Daily Summary
-      final summary = await ApiService.getDailyCaloriesSummary(dateStr);
-      if (summary != null) {
-        _caloriesConsumed = (summary['caloriesConsumed'] as num?)?.toDouble() ?? 0.0;
-        _caloriesTarget = (summary['caloriesTarget'] as num?)?.toDouble() ?? 2000.0;
-        _protein = (summary['protein'] as num?)?.toDouble() ?? 0.0;
-        _carbs = (summary['carbs'] as num?)?.toDouble() ?? 0.0;
-        _fat = (summary['fat'] as num?)?.toDouble() ?? 0.0;
-        _remaining = (summary['remainingCalories'] as num?)?.toDouble() ?? 2000.0;
-      }
-
-      // 2. Get Meal History for selected date
-      final history = await ApiService.getMealHistory(date: dateStr);
-      if (history != null) {
-        _meals = history['items'] ?? [];
-      }
-    } catch (e) {
-      debugPrint("Error loading meals: $e");
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  void _changeDate(int days) {
-    setState(() {
-      _selectedDate = _selectedDate.add(Duration(days: days));
-    });
-    _loadMealLogs();
-  }
-
-  Future<void> _selectDate(BuildContext context) async {
+  Future<void> _selectDate(BuildContext context, DateTime currentDate) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate,
+      initialDate: currentDate,
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
       builder: (context, child) {
@@ -107,11 +65,10 @@ class _MealTabState extends State<MealTab> {
         );
       },
     );
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-      });
-      _loadMealLogs();
+    if (picked != null && picked != currentDate) {
+      if (mounted) {
+        context.read<MealCubit>().selectDate(picked);
+      }
     }
   }
 
@@ -132,80 +89,42 @@ class _MealTabState extends State<MealTab> {
       ),
     );
 
-    if (confirm == true) {
-      final success = await ApiService.deleteMeal(mealId);
-      if (success) {
-        _loadMealLogs();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Đã xóa nhật ký bữa ăn thành công")),
-        );
-      }
+    if (confirm == true && mounted) {
+      context.read<MealCubit>().deleteMeal(mealId);
     }
   }
 
-  Future<void> _editMealItemQuantity(Map<String, dynamic> meal, Map<String, dynamic> itemToUpdate, double newQuantity) async {
-    final mealId = meal['mealId'];
-    if (mealId == null) return;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
-
-    final List<dynamic> currentItems = meal['items'] as List<dynamic>? ?? [];
-    final updatedItemsPayload = currentItems.map((item) {
-      final foodId = item['foodId'];
-      final quantity = (item['foodId'] == itemToUpdate['foodId']) ? newQuantity : (item['quantity'] as num).toDouble();
+  Future<void> _editMealItemQuantity(Meal meal, int foodId, String mealType, String notes, double newQuantity) async {
+    final updatedItemsPayload = meal.items.map((item) {
+      final quantity = (item.foodId == foodId) ? newQuantity : item.quantity;
       return {
-        "foodId": foodId,
+        "foodId": item.foodId,
         "quantity": quantity,
       };
     }).toList();
 
     final mealData = {
-      "mealType": meal['mealType'],
-      "notes": meal['notes'] ?? '',
+      "mealType": mealType,
+      "notes": notes,
       "items": updatedItemsPayload,
     };
 
-    final res = await ApiService.updateMeal(mealId, mealData);
-
-    if (mounted) {
-      Navigator.pop(context); // Close loading dialog
-    }
-
-    if (res != null) {
-      _loadMealLogs();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text("Đã cập nhật số lượng khẩu phần ăn thành công!"),
-          backgroundColor: primaryGreen,
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Lỗi: Không thể cập nhật số lượng khẩu phần ăn."),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-    }
+    context.read<MealCubit>().updateMeal(meal.mealId, mealData);
   }
 
-  void _showEditItemQuantityDialog(Map<String, dynamic> meal, Map<String, dynamic> item) {
-    final currentQty = (item['quantity'] as num?)?.toDouble() ?? 1.0;
+  void _showEditItemQuantityDialog(Meal meal, dynamic item) {
+    final currentQty = item.quantity;
     final qtyController = TextEditingController(text: currentQty % 1 == 0 ? currentQty.toInt().toString() : currentQty.toString());
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text("Sửa số lượng cho ${item['foodName']}"),
+        title: Text("Sửa số lượng cho ${item.foodName}"),
         content: TextField(
           controller: qtyController,
           decoration: InputDecoration(
-            labelText: "Số lượng (Khẩu phần chuẩn: ${item['servingSize'] ?? '1 phần'})",
+            labelText: "Số lượng (Khẩu phần chuẩn: ${item.servingSize ?? '1 phần'})",
             suffixText: "khẩu phần",
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -221,7 +140,7 @@ class _MealTabState extends State<MealTab> {
               final newQty = double.tryParse(qtyController.text);
               if (newQty != null && newQty > 0) {
                 Navigator.pop(context);
-                _editMealItemQuantity(meal, item, newQty);
+                _editMealItemQuantity(meal, item.foodId, meal.mealType, meal.notes ?? '', newQty);
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text("Vui lòng nhập số lượng hợp lệ")),
@@ -239,49 +158,61 @@ class _MealTabState extends State<MealTab> {
     );
   }
 
-  void _openAddMealWizard() {
+  void _openAddMealWizard(DateTime selectedDate) {
     String selectedMealType = 'Breakfast';
     final notesController = TextEditingController();
     List<Map<String, dynamic>> mealItems = [];
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogCtx) {
         return StatefulBuilder(
           builder: (context, setWizardState) {
             void searchAndAddFood() {
               final searchController = TextEditingController();
-              List<dynamic> foodResults = [];
+              List<Food> foodResults = [];
               bool searchingFood = true;
               bool initiated = false;
 
               showDialog(
                 context: context,
-                builder: (context) {
+                builder: (searchCtx) {
                   return StatefulBuilder(
                     builder: (context, setSearchState) {
                       Future<void> performSearch(String query) async {
                         setSearchState(() => searchingFood = true);
-                        final results = await ApiService.searchFoods(query, pageSize: 100);
-                        final favs = await ApiService.getFavoriteFoods() ?? [];
+                        final cubit = dialogCtx.read<MealCubit>();
+                        final results = await cubit.searchFoods(query);
+                        final favs = await cubit.getFavoriteFoods();
+                        
                         setSearchState(() {
-                          final List<dynamic> loaded = results != null ? results['items'] ?? [] : [];
-                          final favIds = favs.map((f) => f['foodId']).toSet();
-                          for (var f in loaded) {
-                            f['isFavorite'] = favIds.contains(f['foodId']);
-                          }
-                          // Sort custom foods first, then favorites, then standard foods
-                          loaded.sort((a, b) {
-                            final aCustom = (a['isCustom'] == true || a['foodType'] == 'Custom') ? 1 : 0;
-                            final bCustom = (b['isCustom'] == true || b['foodType'] == 'Custom') ? 1 : 0;
+                          final favIds = favs.map((f) => f.foodId).toSet();
+                          foodResults = results.map((f) {
+                            return Food(
+                              foodId: f.foodId,
+                              name: f.name,
+                              calories: f.calories,
+                              protein: f.protein,
+                              carbs: f.carbs,
+                              fat: f.fat,
+                              servingSize: f.servingSize,
+                              isCustom: f.isCustom,
+                              isFavorite: favIds.contains(f.foodId),
+                              foodType: f.foodType,
+                            );
+                          }).toList();
+
+                          // Sort: Custom foods first, then favorites, then standard
+                          foodResults.sort((a, b) {
+                            final aCustom = (a.isCustom || a.foodType == 'Custom') ? 1 : 0;
+                            final bCustom = (b.isCustom || b.foodType == 'Custom') ? 1 : 0;
                             if (aCustom != bCustom) {
-                              return bCustom.compareTo(aCustom); // Custom foods at the absolute top
+                              return bCustom.compareTo(aCustom);
                             }
-                            final aFav = a['isFavorite'] == true ? 1 : 0;
-                            final bFav = b['isFavorite'] == true ? 1 : 0;
-                            return bFav.compareTo(aFav); // Then favorites
+                            final aFav = a.isFavorite ? 1 : 0;
+                            final bFav = b.isFavorite ? 1 : 0;
+                            return bFav.compareTo(aFav);
                           });
-                          foodResults = loaded;
                           searchingFood = false;
                         });
                       }
@@ -321,14 +252,14 @@ class _MealTabState extends State<MealTab> {
                                               itemCount: foodResults.length,
                                               itemBuilder: (context, idx) {
                                                 final food = foodResults[idx];
-                                                final isFav = food['isFavorite'] == true;
-                                                final isCustom = food['isCustom'] == true || food['foodType'] == 'Custom';
+                                                final isFav = food.isFavorite;
+                                                final isCustom = food.isCustom || food.foodType == 'Custom';
                                                 return ListTile(
                                                   title: Row(
                                                     children: [
                                                       Expanded(
                                                         child: Text(
-                                                          food['name'] ?? '',
+                                                          food.name,
                                                           style: const TextStyle(fontWeight: FontWeight.bold),
                                                         ),
                                                       ),
@@ -340,7 +271,7 @@ class _MealTabState extends State<MealTab> {
                                                     crossAxisAlignment: WrapCrossAlignment.center,
                                                     spacing: 6,
                                                     children: [
-                                                      Text("${food['calories']} kcal / ${food['servingSize'] ?? '100g'}"),
+                                                      Text("${food.calories.round()} kcal / ${food.servingSize ?? '100g'}"),
                                                       if (isCustom)
                                                         Container(
                                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
@@ -358,7 +289,7 @@ class _MealTabState extends State<MealTab> {
                                                   ),
                                                   trailing: const Icon(Icons.add_circle_outline, color: Colors.green),
                                                   onTap: () {
-                                                    Navigator.pop(context, food);
+                                                    Navigator.pop(searchCtx, food);
                                                   },
                                                 );
                                               },
@@ -372,19 +303,19 @@ class _MealTabState extends State<MealTab> {
                   );
                 },
               ).then((selectedFood) {
-                if (selectedFood != null && selectedFood is Map) {
+                if (selectedFood != null && selectedFood is Food) {
                   final qtyController = TextEditingController(text: "1");
                   showDialog(
                     context: context,
                     builder: (context) => AlertDialog(
-                      title: Text("Số lượng cho ${selectedFood['name']}"),
+                      title: Text("Số lượng cho ${selectedFood.name}"),
                       content: TextField(
                         controller: qtyController,
                         decoration: InputDecoration(
-                          labelText: "Số lượng (Khẩu phần chuẩn: ${selectedFood['servingSize'] ?? '1 phần'})",
+                          labelText: "Số lượng (Khẩu phần chuẩn: ${selectedFood.servingSize ?? '1 phần'})",
                           suffixText: "khẩu phần",
                         ),
-                        keyboardType: TextInputType.number,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       ),
                       actions: [
                         TextButton(onPressed: () => Navigator.pop(context), child: const Text("Hủy")),
@@ -399,14 +330,14 @@ class _MealTabState extends State<MealTab> {
                     ),
                   ).then((quantity) {
                     if (quantity != null && quantity is double) {
-                      final servingSize = selectedFood['servingSize']?.toString();
+                      final servingSize = selectedFood.servingSize;
                       setWizardState(() {
                         mealItems.add({
-                          "foodId": selectedFood['foodId'],
-                          "name": selectedFood['name'],
+                          "foodId": selectedFood.foodId,
+                          "name": selectedFood.name,
                           "quantity": quantity,
                           "servingSize": servingSize,
-                          "calories": (selectedFood['calories'] as num).toDouble() * quantity
+                          "calories": selectedFood.calories * quantity
                         });
                       });
                     }
@@ -500,44 +431,24 @@ class _MealTabState extends State<MealTab> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => Navigator.pop(dialogCtx),
                   child: const Text("Hủy", style: TextStyle(color: Colors.grey)),
                 ),
                 ElevatedButton(
                   onPressed: mealItems.isEmpty
                       ? null
-                      : () async {
+                      : () {
                           final mealData = {
                             "mealType": selectedMealType,
-                            "mealDate": _selectedDate.toIso8601String(),
+                            "mealDate": selectedDate.toIso8601String(),
                             "notes": notesController.text.trim(),
                             "items": mealItems.map((item) => {
                               "foodId": item['foodId'],
                               "quantity": item['quantity'],
                             }).toList()
                           };
-
-                          showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (context) => const Center(child: CircularProgressIndicator()),
-                          );
-
-                          final res = await ApiService.addMeal(mealData);
-                          if (context.mounted) {
-                            Navigator.pop(context); // Close loading
-                            Navigator.pop(context); // Close wizard
-                          }
-
-                          if (res != null) {
-                            _loadMealLogs();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text("Đã thêm bữa ăn vào ${mealTypeMap[selectedMealType]} thành công!"),
-                                backgroundColor: primaryGreen,
-                              ),
-                            );
-                          }
+                          Navigator.pop(dialogCtx);
+                          context.read<MealCubit>().addMeal(mealData);
                         },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryGreen,
@@ -553,10 +464,10 @@ class _MealTabState extends State<MealTab> {
     );
   }
 
-  String _getFormattedDate() {
-    final isToday = DateFormat('yyyy-MM-dd').format(_selectedDate) == DateFormat('yyyy-MM-dd').format(DateTime.now());
+  String _getFormattedDate(DateTime date) {
+    final isToday = DateFormat('yyyy-MM-dd').format(date) == DateFormat('yyyy-MM-dd').format(DateTime.now());
     if (isToday) {
-      return "Hôm nay, ngày ${DateFormat('dd/MM/yyyy').format(_selectedDate)}";
+      return "Hôm nay, ngày ${DateFormat('dd/MM/yyyy').format(date)}";
     }
     final weekdayMap = {
       'Monday': 'Thứ Hai',
@@ -567,64 +478,123 @@ class _MealTabState extends State<MealTab> {
       'Saturday': 'Thứ Bảy',
       'Sunday': 'Chủ Nhật',
     };
-    final englishDay = DateFormat('EEEE').format(_selectedDate);
+    final englishDay = DateFormat('EEEE').format(date);
     final vietnameseDay = weekdayMap[englishDay] ?? englishDay;
-    return "$vietnameseDay, ngày ${DateFormat('dd/MM/yyyy').format(_selectedDate)}";
+    return "$vietnameseDay, ngày ${DateFormat('dd/MM/yyyy').format(date)}";
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7FAFC),
-      appBar: AppBar(
-        title: const Text(
-          "Nhật ký bữa ăn",
-          style: TextStyle(color: Color(0xFF2D3748), fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.add_circle_outline, color: primaryGreen),
-            tooltip: "Thêm bữa ăn",
-            onPressed: _openAddMealWizard,
-          ),
-          IconButton(
-            icon: Icon(Icons.calendar_today, color: primaryGreen),
-            onPressed: () => _selectDate(context),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          _buildDateBanner(),
-          Expanded(
-            child: _isLoading
-                ? Center(child: CircularProgressIndicator(color: primaryGreen))
-                : SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      children: [
-                        AnimatedFadeSlide(
-                          delay: 0,
-                          child: _buildDailySummaryCard(),
+    return BlocConsumer<MealCubit, MealState>(
+      listener: (context, state) {
+        if (state is MealLoaded && state.toastMessage != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.toastMessage!),
+              backgroundColor: primaryGreen,
+            ),
+          );
+        }
+      },
+      builder: (context, state) {
+        if (state is MealInitial || state is MealLoading) {
+          return Scaffold(
+            backgroundColor: const Color(0xFFF7FAFC),
+            body: Center(child: CircularProgressIndicator(color: primaryGreen)),
+          );
+        }
+
+        if (state is MealError) {
+          return Scaffold(
+            backgroundColor: const Color(0xFFF7FAFC),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Text(
+                  state.message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.redAccent, fontSize: 16),
+                ),
+              ),
+            ),
+          );
+        }
+
+        if (state is MealLoaded) {
+          final summary = state.summary;
+          final meals = state.meals;
+          final date = state.selectedDate;
+
+          return Scaffold(
+            backgroundColor: const Color(0xFFF7FAFC),
+            appBar: AppBar(
+              title: const Text(
+                "Nhật ký bữa ăn",
+                style: TextStyle(color: Color(0xFF2D3748), fontWeight: FontWeight.bold),
+              ),
+              backgroundColor: Colors.white,
+              elevation: 0,
+              actions: [
+                IconButton(
+                  icon: Icon(Icons.add_circle_outline, color: primaryGreen),
+                  tooltip: "Thêm bữa ăn",
+                  onPressed: () => _openAddMealWizard(date),
+                ),
+                IconButton(
+                  icon: Icon(Icons.calendar_today, color: primaryGreen),
+                  onPressed: () => _selectDate(context, date),
+                ),
+              ],
+            ),
+            body: Stack(
+              children: [
+                Column(
+                  children: [
+                    _buildDateBanner(date),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            AnimatedFadeSlide(
+                              delay: 0,
+                              child: _buildDailySummaryCard(
+                                summary.caloriesConsumed,
+                                summary.caloriesTarget,
+                                summary.protein,
+                                summary.carbs,
+                                summary.fat,
+                                summary.remainingCalories,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            AnimatedFadeSlide(
+                              delay: 100,
+                              child: _buildMealHistorySection(meals, date),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 20),
-                        AnimatedFadeSlide(
-                          delay: 100,
-                          child: _buildMealHistorySection(),
-                        ),
-                      ],
-                    ),
+                      ),
+                    )
+                  ],
+                ),
+                if (state.isOperationLoading)
+                  Container(
+                    color: Colors.black.withOpacity(0.2),
+                    child: const Center(child: CircularProgressIndicator()),
                   ),
-          )
-        ],
-      ),
+              ],
+            ),
+          );
+        }
+
+        return const SizedBox.shrink();
+      },
     );
   }
 
-  Widget _buildDateBanner() {
+  Widget _buildDateBanner(DateTime date) {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -633,23 +603,30 @@ class _MealTabState extends State<MealTab> {
         children: [
           IconButton(
             icon: const Icon(Icons.chevron_left),
-            onPressed: () => _changeDate(-1),
+            onPressed: () => context.read<MealCubit>().changeDate(-1),
           ),
           Text(
-            _getFormattedDate(),
+            _getFormattedDate(date),
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF2D3748)),
           ),
           IconButton(
             icon: const Icon(Icons.chevron_right),
-            onPressed: () => _changeDate(1),
+            onPressed: () => context.read<MealCubit>().changeDate(1),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDailySummaryCard() {
-    final caloriePercent = _caloriesTarget > 0 ? (_caloriesConsumed / _caloriesTarget).clamp(0.0, 1.0) : 0.0;
+  Widget _buildDailySummaryCard(
+    double caloriesConsumed,
+    double caloriesTarget,
+    double protein,
+    double carbs,
+    double fat,
+    double remaining,
+  ) {
+    final caloriePercent = caloriesTarget > 0 ? (caloriesConsumed / caloriesTarget).clamp(0.0, 1.0) : 0.0;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -671,7 +648,7 @@ class _MealTabState extends State<MealTab> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    "${_caloriesConsumed.round()}",
+                    "${caloriesConsumed.round()}",
                     style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: primaryGreen),
                   ),
                   const Text("Đã nạp (kcal)", style: TextStyle(color: Colors.grey, fontSize: 12)),
@@ -681,7 +658,7 @@ class _MealTabState extends State<MealTab> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    "${_caloriesTarget.round()}",
+                    "${caloriesTarget.round()}",
                     style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF2D3748)),
                   ),
                   const Text("Mục tiêu (kcal)", style: TextStyle(color: Colors.grey, fontSize: 12)),
@@ -691,11 +668,11 @@ class _MealTabState extends State<MealTab> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    "${_remaining.round()}",
+                    "${remaining.round()}",
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
-                      color: _remaining > 0 ? Colors.green[700] : Colors.redAccent,
+                      color: remaining > 0 ? Colors.green[700] : Colors.redAccent,
                     ),
                   ),
                   const Text("Còn lại (kcal)", style: TextStyle(color: Colors.grey, fontSize: 12)),
@@ -724,9 +701,9 @@ class _MealTabState extends State<MealTab> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _macroMetric("Đạm (Protein)", "${_protein.round()}g"),
-              _macroMetric("Tinh bột (Carbs)", "${_carbs.round()}g"),
-              _macroMetric("Chất béo (Fats)", "${_fat.round()}g"),
+              _macroMetric("Đạm (Protein)", "${protein.round()}g"),
+              _macroMetric("Tinh bột (Carbs)", "${carbs.round()}g"),
+              _macroMetric("Chất béo (Fats)", "${fat.round()}g"),
             ],
           )
         ],
@@ -743,7 +720,7 @@ class _MealTabState extends State<MealTab> {
     );
   }
 
-  Widget _buildMealHistorySection() {
+  Widget _buildMealHistorySection(List<Meal> meals, DateTime date) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -756,13 +733,13 @@ class _MealTabState extends State<MealTab> {
             ),
             IconButton(
               icon: Icon(Icons.add_circle, color: primaryGreen, size: 28),
-              onPressed: _openAddMealWizard,
+              onPressed: () => _openAddMealWizard(date),
               tooltip: "Thêm bữa ăn mới",
             ),
           ],
         ),
         const SizedBox(height: 12),
-        _meals.isEmpty
+        meals.isEmpty
             ? Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(40),
@@ -784,9 +761,9 @@ class _MealTabState extends State<MealTab> {
             : ListView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: _meals.length,
+                itemCount: meals.length,
                 itemBuilder: (context, idx) {
-                  final meal = _meals[idx];
+                  final meal = meals[idx];
                   return AnimatedFadeSlide(
                     delay: (idx * 50).clamp(0, 300),
                     child: _buildMealCard(meal),
@@ -797,11 +774,11 @@ class _MealTabState extends State<MealTab> {
     );
   }
 
-  Widget _buildMealCard(Map<String, dynamic> meal) {
-    final items = meal['items'] as List<dynamic>? ?? [];
-    final mealType = meal['mealType'] ?? 'Meal';
-    final calories = (meal['totalCalories'] as num?)?.toDouble() ?? 0.0;
-    final mealId = meal['mealId'];
+  Widget _buildMealCard(Meal meal) {
+    final items = meal.items;
+    final mealType = meal.mealType;
+    final calories = meal.totalCalories;
+    final mealId = meal.mealId;
 
     IconData typeIcon = Icons.restaurant;
     Color iconColor = primaryGreen;
@@ -844,9 +821,9 @@ class _MealTabState extends State<MealTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (meal['notes'] != null && meal['notes'].toString().isNotEmpty) ...[
+                if (meal.notes != null && meal.notes!.isNotEmpty) ...[
                   Text(
-                    "Ghi chú: ${meal['notes']}",
+                    "Ghi chú: ${meal.notes}",
                     style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Colors.grey),
                   ),
                   const Divider(),
@@ -864,12 +841,12 @@ class _MealTabState extends State<MealTab> {
                         children: [
                           Expanded(
                             child: Text(
-                              "${item['foodName']} (x${item['quantity'] % 1 == 0 ? (item['quantity'] as num).toInt() : item['quantity']})",
+                              "${item.foodName} (x${item.quantity % 1 == 0 ? item.quantity.toInt() : item.quantity})",
                               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                             ),
                           ),
                           Text(
-                            "${(item['calories'] as num).round()} kcal",
+                            "${item.calories.round()} kcal",
                             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(width: 8),
@@ -924,21 +901,4 @@ class AnimatedFadeSlide extends StatelessWidget {
       child: child,
     );
   }
-}
-
-double parseServingWeight(String? servingSize) {
-  if (servingSize == null || servingSize.isEmpty) return 100.0;
-  final regExp = RegExp(r'([0-9]+(?:\.[0-9]+)?)');
-  final match = regExp.firstMatch(servingSize);
-  if (match != null) {
-    final parsed = double.tryParse(match.group(1) ?? '');
-    if (parsed != null && parsed > 0) return parsed;
-  }
-  return 1.0; // Fallback to 1 (e.g. "portion", "serving", "phần", "cái")
-}
-
-String getServingUnit(String? servingSize) {
-  if (servingSize == null || servingSize.isEmpty) return 'g';
-  final clean = servingSize.replaceAll(RegExp(r'[0-9\.\s]'), '');
-  return clean.isNotEmpty ? clean : 'g';
 }

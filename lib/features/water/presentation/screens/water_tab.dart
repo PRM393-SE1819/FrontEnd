@@ -1,26 +1,36 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/network/api_service.dart';
+import '../../../../di/dependency_injection.dart';
+import '../../domain/entities/water_log.dart';
+import '../../domain/entities/water_reminder.dart';
+import '../../domain/repositories/water_repository.dart';
+import '../cubit/water_cubit.dart';
+import '../cubit/water_state.dart';
 
-class WaterTab extends StatefulWidget {
+class WaterTab extends StatelessWidget {
   const WaterTab({super.key});
 
   @override
-  State<WaterTab> createState() => _WaterTabState();
+  Widget build(BuildContext context) {
+    return BlocProvider<WaterCubit>(
+      create: (context) => WaterCubit(
+        repository: getIt<WaterRepository>(),
+      )..loadWaterData(DateTime.now()),
+      child: const WaterTabContent(),
+    );
+  }
 }
 
-class _WaterTabState extends State<WaterTab> {
-  bool _isLoading = false;
-  DateTime _selectedDate = DateTime.now();
+class WaterTabContent extends StatefulWidget {
+  const WaterTabContent({super.key});
 
-  // Water data
-  double _consumedML = 0;
-  double _goalML = 2000;
-  List<dynamic> _logs = [];
-  List<dynamic> _reminders = [];
+  @override
+  State<WaterTabContent> createState() => _WaterTabContentState();
+}
 
-  // Reminder Timer and Checkers
+class _WaterTabContentState extends State<WaterTabContent> {
   Timer? _reminderTimer;
   final Set<String> _notifiedTimes = {};
 
@@ -30,187 +40,33 @@ class _WaterTabState extends State<WaterTab> {
   @override
   void initState() {
     super.initState();
-    _loadWaterData();
     _startReminderCheck();
   }
 
-  Future<void> _loadWaterData() async {
-    setState(() => _isLoading = true);
-    final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
-
-    try {
-      // 1. Get daily summary
-      final summary = await ApiService.getDailyWaterSummary(dateStr);
-      if (summary != null) {
-        _consumedML = (summary['consumedML'] as num?)?.toDouble() ?? 0.0;
-        _goalML = (summary['goalML'] as num?)?.toDouble() ?? 2000.0;
-      }
-
-      // 2. Get today's logs
-      final history = await ApiService.getWaterLogHistory(date: dateStr);
-      if (history != null) {
-        _logs = history['items'] ?? [];
-      }
-
-      // 3. Get reminders list
-      final rems = await ApiService.getWaterReminders();
-      if (rems != null) {
-        _reminders = rems;
-      }
-    } catch (e) {
-      debugPrint("Error loading water data: $e");
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  Future<void> _addWater(double amount) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
-
-    final res = await ApiService.addWaterLog(amount);
-    if (!mounted) return;
-    Navigator.pop(context); // Close loading
-
-    if (res != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Đã ghi nhận +${amount.round()} ml nước!"),
-          backgroundColor: waterBlue,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      _loadWaterData();
-    }
-  }
-
-  Future<void> _deleteLog(int logId) async {
-    final success = await ApiService.deleteWaterLog(logId);
-    if (success) {
-      _loadWaterData();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Đã xóa nhật ký uống nước"), behavior: SnackBarBehavior.floating),
-      );
-    }
-  }
-
-  void _openCustomWaterDialog() {
-    final amountController = TextEditingController(text: "250");
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("Ghi nhận lượng nước tùy chỉnh"),
-        content: TextField(
-          controller: amountController,
-          decoration: const InputDecoration(
-            labelText: "Lượng nước (ml)",
-            suffixText: "ml",
-          ),
-          keyboardType: TextInputType.number,
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Hủy", style: TextStyle(color: Colors.grey))),
-          ElevatedButton(
-            onPressed: () {
-              final amount = double.tryParse(amountController.text) ?? 250.0;
-              Navigator.pop(context);
-              _addWater(amount);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: waterBlue),
-            child: const Text("Ghi", style: TextStyle(color: Colors.white)),
-          )
-        ],
-      ),
-    );
-  }
-
-  void _openUpdateGoalDialog() {
-    final goalController = TextEditingController(text: _goalML.round().toString());
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("Cập nhật mục tiêu nước ngày"),
-        content: TextField(
-          controller: goalController,
-          decoration: const InputDecoration(
-            labelText: "Mục tiêu hàng ngày (ml)",
-            suffixText: "ml",
-          ),
-          keyboardType: TextInputType.number,
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Hủy", style: TextStyle(color: Colors.grey))),
-          ElevatedButton(
-            onPressed: () async {
-              final target = double.tryParse(goalController.text) ?? 2000.0;
-              Navigator.pop(context);
-              final res = await ApiService.updateWaterGoal(target);
-              if (res != null) {
-                _loadWaterData();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Đã cập nhật mục tiêu thành công")),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: waterBlue),
-            child: const Text("Lưu", style: TextStyle(color: Colors.white)),
-          )
-        ],
-      ),
-    );
-  }
-
-  void _addReminder() async {
-    final TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.now(),
-    );
-    if (picked != null) {
-      final hourStr = picked.hour.toString().padLeft(2, '0');
-      final minStr = picked.minute.toString().padLeft(2, '0');
-      final timeStr = "$hourStr:$minStr:00";
-
-      final res = await ApiService.createWaterReminder(timeStr);
-      if (res != null) {
-        _loadWaterData();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Đã thêm nhắc nhở uống nước!")),
-        );
-      }
-    }
-  }
-
-  Future<void> _deleteReminder(int reminderId) async {
-    final success = await ApiService.deleteWaterReminder(reminderId);
-    if (success) {
-      _loadWaterData();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Đã xóa nhắc nhở thành công")),
-      );
-    }
+  @override
+  void dispose() {
+    _reminderTimer?.cancel();
+    super.dispose();
   }
 
   void _startReminderCheck() {
     _reminderTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
       if (!mounted) return;
+      final state = context.read<WaterCubit>().state;
+      if (state is! WaterLoaded) return;
+
+      final reminders = state.reminders;
       final now = DateTime.now();
       final currentHourMin = DateFormat('HH:mm').format(now);
       
       // Clean up past entries from cache
       _notifiedTimes.removeWhere((time) => time != currentHourMin);
 
-      for (final reminder in _reminders) {
-        final isEnabled = reminder['isEnabled'] ?? true;
+      for (final reminder in reminders) {
+        final isEnabled = reminder.isEnabled;
         if (!isEnabled) continue;
 
-        final reminderTimeStr = reminder['reminderTime'] ?? '';
+        final reminderTimeStr = reminder.reminderTime;
         if (reminderTimeStr.isEmpty) continue;
 
         final parts = reminderTimeStr.split(':');
@@ -230,7 +86,7 @@ class _WaterTabState extends State<WaterTab> {
   void _showWaterReminderAlert(String time) {
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogCtx) {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Row(
@@ -243,13 +99,13 @@ class _WaterTabState extends State<WaterTab> {
           content: Text("Đã đến $time! Hãy uống nước để giữ cơ thể luôn đủ nước nhé."),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogCtx),
               child: const Text("Bỏ qua", style: TextStyle(color: Colors.grey)),
             ),
             ElevatedButton(
               onPressed: () {
-                Navigator.pop(context);
-                _addWater(250);
+                Navigator.pop(dialogCtx);
+                context.read<WaterCubit>().addWater(250.0);
               },
               style: ElevatedButton.styleFrom(backgroundColor: waterBlue),
               child: const Text("Uống 250ml", style: TextStyle(color: Colors.white)),
@@ -260,62 +116,188 @@ class _WaterTabState extends State<WaterTab> {
     );
   }
 
-  @override
-  void dispose() {
-    _reminderTimer?.cancel();
-    super.dispose();
+  void _openCustomWaterDialog() {
+    final amountController = TextEditingController(text: "250");
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("Ghi nhận lượng nước tùy chỉnh"),
+        content: TextField(
+          controller: amountController,
+          decoration: const InputDecoration(
+            labelText: "Lượng nước (ml)",
+            suffixText: "ml",
+          ),
+          keyboardType: TextInputType.number,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text("Hủy", style: TextStyle(color: Colors.grey))),
+          ElevatedButton(
+            onPressed: () {
+              final amount = double.tryParse(amountController.text) ?? 250.0;
+              Navigator.pop(dialogCtx);
+              context.read<WaterCubit>().addWater(amount);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: waterBlue),
+            child: const Text("Ghi", style: TextStyle(color: Colors.white)),
+          )
+        ],
+      ),
+    );
+  }
+
+  void _openUpdateGoalDialog(double currentGoal) {
+    final goalController = TextEditingController(text: currentGoal.round().toString());
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("Cập nhật mục tiêu nước ngày"),
+        content: TextField(
+          controller: goalController,
+          decoration: const InputDecoration(
+            labelText: "Mục tiêu hàng ngày (ml)",
+            suffixText: "ml",
+          ),
+          keyboardType: TextInputType.number,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text("Hủy", style: TextStyle(color: Colors.grey))),
+          ElevatedButton(
+            onPressed: () {
+              final target = double.tryParse(goalController.text) ?? 2000.0;
+              Navigator.pop(dialogCtx);
+              context.read<WaterCubit>().updateGoal(target);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: waterBlue),
+            child: const Text("Lưu", style: TextStyle(color: Colors.white)),
+          )
+        ],
+      ),
+    );
+  }
+
+  void _addReminder() async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+    if (picked != null) {
+      final hourStr = picked.hour.toString().padLeft(2, '0');
+      final minStr = picked.minute.toString().padLeft(2, '0');
+      final timeStr = "$hourStr:$minStr:00";
+      if (mounted) {
+        context.read<WaterCubit>().addReminder(timeStr);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final percent = _goalML > 0 ? (_consumedML / _goalML).clamp(0.0, 1.0) : 0.0;
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7FAFC),
-      appBar: AppBar(
-        title: const Text(
-          "Theo dõi nước uống",
-          style: TextStyle(color: Color(0xFF2D3748), fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: waterBlue))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                children: [
-                  AnimatedFadeSlide(
-                    delay: 0,
-                    child: _buildWaterVisualizerCard(percent),
-                  ),
-                  const SizedBox(height: 25),
-                  AnimatedFadeSlide(
-                    delay: 100,
-                    child: _buildQuickAddGrid(),
-                  ),
-                  const SizedBox(height: 25),
-                  AnimatedFadeSlide(
-                    delay: 150,
-                    child: _buildGoalCard(),
-                  ),
-                  const SizedBox(height: 25),
-                  AnimatedFadeSlide(
-                    delay: 200,
-                    child: _buildRemindersSection(),
-                  ),
-                  const SizedBox(height: 25),
-                  AnimatedFadeSlide(
-                    delay: 250,
-                    child: _buildLogsHistorySection(),
-                  ),
-                ],
-              ),
+    return BlocListener<WaterCubit, WaterState>(
+      listenWhen: (previous, current) =>
+          current is WaterLoaded && current.toastMessage != null,
+      listener: (context, state) {
+        if (state is WaterLoaded && state.toastMessage != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.toastMessage!),
+              backgroundColor: waterBlue,
+              behavior: SnackBarBehavior.floating,
             ),
+          );
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF7FAFC),
+        appBar: AppBar(
+          title: const Text(
+            "Theo dõi nước uống",
+            style: TextStyle(color: Color(0xFF2D3748), fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Colors.white,
+          elevation: 0,
+        ),
+        body: BlocBuilder<WaterCubit, WaterState>(
+          builder: (context, state) {
+            if (state is WaterLoading) {
+              return Center(child: CircularProgressIndicator(color: waterBlue));
+            }
+            if (state is WaterError) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      state.message,
+                      style: const TextStyle(color: Colors.redAccent, fontSize: 16),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: () => context.read<WaterCubit>().loadWaterData(DateTime.now()),
+                      child: const Text("Tải lại"),
+                    )
+                  ],
+                ),
+              );
+            }
+            if (state is WaterLoaded) {
+              final summary = state.summary;
+              final percent = summary.goalML > 0 ? (summary.consumedML / summary.goalML).clamp(0.0, 1.0) : 0.0;
+
+              return Stack(
+                children: [
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      children: [
+                        AnimatedFadeSlide(
+                          delay: 0,
+                          child: _buildWaterVisualizerCard(summary.consumedML, summary.goalML, percent),
+                        ),
+                        const SizedBox(height: 25),
+                        AnimatedFadeSlide(
+                          delay: 100,
+                          child: _buildQuickAddGrid(),
+                        ),
+                        const SizedBox(height: 25),
+                        AnimatedFadeSlide(
+                          delay: 150,
+                          child: _buildGoalCard(summary.goalML),
+                        ),
+                        const SizedBox(height: 25),
+                        AnimatedFadeSlide(
+                          delay: 200,
+                          child: _buildRemindersSection(state.reminders),
+                        ),
+                        const SizedBox(height: 25),
+                        AnimatedFadeSlide(
+                          delay: 250,
+                          child: _buildLogsHistorySection(state.logs),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (state.isOperationLoading)
+                    Container(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      child: Center(
+                        child: CircularProgressIndicator(color: waterBlue),
+                      ),
+                    ),
+                ],
+              );
+            }
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
     );
   }
 
-  Widget _buildWaterVisualizerCard(double percent) {
+  Widget _buildWaterVisualizerCard(double consumedML, double goalML, double percent) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -358,11 +340,11 @@ class _WaterTabState extends State<WaterTab> {
                   Icon(Icons.local_drink, color: waterBlue, size: 36),
                   const SizedBox(height: 4),
                   Text(
-                    "${_consumedML.round()} ml",
+                    "${consumedML.round()} ml",
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: waterBlue),
                   ),
                   Text(
-                    "Mục tiêu: ${_goalML.round()} ml",
+                    "Mục tiêu: ${goalML.round()} ml",
                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                 ],
@@ -373,7 +355,7 @@ class _WaterTabState extends State<WaterTab> {
           Text(
             percent >= 1.0
                 ? "🎉 Tuyệt vời! Bạn đã đạt mục tiêu uống nước!"
-                : "Bạn cần uống thêm ${(_goalML - _consumedML).clamp(0, double.infinity).round()} ml để hoàn thành mục tiêu.",
+                : "Bạn cần uống thêm ${(goalML - consumedML).clamp(0, double.infinity).round()} ml để hoàn thành mục tiêu.",
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
@@ -429,32 +411,36 @@ class _WaterTabState extends State<WaterTab> {
   }
 
   Widget _waterQuickBtn(IconData icon, String label, double amount) {
-    return InkWell(
-      onTap: () => _addWater(amount),
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        height: 90,
-        decoration: BoxDecoration(
-          color: Colors.white,
+    return Builder(
+      builder: (context) {
+        return InkWell(
+          onTap: () => context.read<WaterCubit>().addWater(amount),
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 8, offset: const Offset(0, 2))
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: waterBlue, size: 28),
-            const SizedBox(height: 4),
-            Text("+${amount.round()}ml", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-            Text(label, style: TextStyle(color: Colors.grey[500], fontSize: 11)),
-          ],
-        ),
-      ),
+          child: Container(
+            height: 90,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 8, offset: const Offset(0, 2))
+              ],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, color: waterBlue, size: 28),
+                const SizedBox(height: 4),
+                Text("+${amount.round()}ml", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                Text(label, style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+              ],
+            ),
+          ),
+        );
+      }
     );
   }
 
-  Widget _buildGoalCard() {
+  Widget _buildGoalCard(double goalML) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
@@ -482,7 +468,7 @@ class _WaterTabState extends State<WaterTab> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        "Mục tiêu: ${_goalML.round()} ml",
+                        "Mục tiêu: ${goalML.round()} ml",
                         style: const TextStyle(color: Colors.grey, fontSize: 12),
                       ),
                     ],
@@ -493,7 +479,7 @@ class _WaterTabState extends State<WaterTab> {
           ),
           const SizedBox(width: 8),
           OutlinedButton(
-            onPressed: _openUpdateGoalDialog,
+            onPressed: () => _openUpdateGoalDialog(goalML),
             style: OutlinedButton.styleFrom(
               foregroundColor: waterBlue,
               side: BorderSide(color: waterBlue),
@@ -507,7 +493,7 @@ class _WaterTabState extends State<WaterTab> {
     );
   }
 
-  Widget _buildRemindersSection() {
+  Widget _buildRemindersSection(List<WaterReminder> reminders) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -531,17 +517,17 @@ class _WaterTabState extends State<WaterTab> {
             ],
           ),
           const SizedBox(height: 8),
-          _reminders.isEmpty
+          reminders.isEmpty
               ? Text("Chưa cài đặt nhắc nhở nào.", style: TextStyle(color: Colors.grey[500], fontSize: 13))
               : ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _reminders.length,
+                  itemCount: reminders.length,
                   itemBuilder: (context, idx) {
-                    final reminder = _reminders[idx];
-                    final time = reminder['reminderTime'] ?? '00:00';
-                    final remId = reminder['reminderId'];
-                    final isEnabled = reminder['isEnabled'] ?? true;
+                    final reminder = reminders[idx];
+                    final time = reminder.reminderTime;
+                    final remId = reminder.reminderId;
+                    final isEnabled = reminder.isEnabled;
                     return ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(
@@ -565,14 +551,13 @@ class _WaterTabState extends State<WaterTab> {
                             Switch(
                               value: isEnabled,
                               activeTrackColor: waterBlue,
-                              onChanged: (val) async {
-                                await ApiService.saveReminderEnabledState(remId, val);
-                                _loadWaterData();
+                              onChanged: (val) {
+                                context.read<WaterCubit>().toggleReminder(remId, val);
                               },
                             ),
                             IconButton(
                               icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                              onPressed: () => _deleteReminder(remId),
+                              onPressed: () => context.read<WaterCubit>().deleteReminder(remId),
                             ),
                           ],
                         ),
@@ -585,13 +570,13 @@ class _WaterTabState extends State<WaterTab> {
     );
   }
 
-  Widget _buildLogsHistorySection() {
+  Widget _buildLogsHistorySection(List<WaterLog> logs) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text("Nhật ký uống nước hôm nay", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 12),
-        _logs.isEmpty
+        logs.isEmpty
             ? Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
@@ -603,13 +588,13 @@ class _WaterTabState extends State<WaterTab> {
             : ListView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: _logs.length,
+                itemCount: logs.length,
                 itemBuilder: (context, idx) {
-                  final log = _logs[idx];
-                  final logTime = DateTime.parse(log['loggedAt']).toLocal();
+                  final log = logs[idx];
+                  final logTime = log.loggedAt.toLocal();
                   final timeStr = DateFormat('HH:mm').format(logTime);
-                  final amt = (log['amountML'] as num?)?.toDouble() ?? 0.0;
-                  final logId = log['waterLogId'];
+                  final amt = log.amountML;
+                  final logId = log.waterLogId;
 
                   return AnimatedFadeSlide(
                     delay: (idx * 50).clamp(0, 300),
@@ -623,7 +608,7 @@ class _WaterTabState extends State<WaterTab> {
                         subtitle: Text(timeStr),
                         trailing: IconButton(
                           icon: const Icon(Icons.delete_outline, color: Colors.grey),
-                          onPressed: () => _deleteLog(logId),
+                          onPressed: () => context.read<WaterCubit>().deleteWaterLog(logId),
                         ),
                       ),
                     ),

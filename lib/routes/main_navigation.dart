@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../di/dependency_injection.dart';
 import '../features/dashboard/presentation/screens/dashboard_tab.dart';
 import '../features/food/presentation/screens/food_tab.dart';
 import '../features/meal/presentation/screens/meal_tab.dart';
@@ -7,6 +9,15 @@ import '../features/water/presentation/screens/water_tab.dart';
 import '../features/weight/presentation/screens/weight_tab.dart';
 import '../features/profile/presentation/screens/profile_screen.dart';
 import '../features/ai_coach/presentation/screens/ai_coach_screen.dart';
+import '../features/meal/presentation/cubit/meal_cubit.dart';
+import '../features/profile/presentation/cubit/profile_cubit.dart';
+import '../features/ai_coach/presentation/cubit/ai_coach_cubit.dart';
+import '../features/dashboard/presentation/cubit/dashboard_cubit.dart';
+import '../features/food/presentation/cubit/food_cubit.dart';
+import '../features/weight/presentation/cubit/weight_cubit.dart';
+
+
+
 
 class MainNavigationContainer extends StatefulWidget {
   const MainNavigationContainer({super.key});
@@ -59,18 +70,33 @@ class _MainNavigationContainerState extends State<MainNavigationContainer> {
   @override
   Widget build(BuildContext context) {
     final List<Widget> tabs = [
-      DashboardTab(
-        key: ValueKey("db_$_refreshCounter"),
-        onNavigateToMeals: () => _navigateToTab(2),
-        onNavigateToWater: () => _navigateToTab(3),
-        onNavigateToWeight: () => _navigateToTab(4),
-        onNavigateToAiCoach: () => _navigateToTab(5),
+      BlocProvider<DashboardCubit>(
+        create: (context) => getIt<DashboardCubit>(),
+        child: DashboardTab(
+          key: ValueKey("db_$_refreshCounter"),
+          onNavigateToMeals: () => _navigateToTab(2),
+          onNavigateToWater: () => _navigateToTab(3),
+          onNavigateToWeight: () => _navigateToTab(4),
+          onNavigateToAiCoach: () => _navigateToTab(5),
+        ),
       ),
-      FoodTab(key: ValueKey("food_$_refreshCounter")),
-      MealTab(key: ValueKey("meal_$_refreshCounter")),
+      BlocProvider<FoodCubit>(
+        create: (context) => getIt<FoodCubit>(),
+        child: FoodTab(key: ValueKey("food_$_refreshCounter")),
+      ),
+      BlocProvider<MealCubit>(
+        create: (context) => getIt<MealCubit>(),
+        child: MealTab(key: ValueKey("meal_$_refreshCounter")),
+      ),
       WaterTab(key: ValueKey("water_$_refreshCounter")),
-      WeightTab(key: ValueKey("weight_$_refreshCounter")),
-      AiCoachScreen(key: ValueKey("ai_$_refreshCounter")),
+      BlocProvider<WeightCubit>(
+        create: (context) => getIt<WeightCubit>(),
+        child: WeightTab(key: ValueKey("weight_$_refreshCounter")),
+      ),
+      BlocProvider<AiCoachCubit>(
+        create: (context) => getIt<AiCoachCubit>(),
+        child: AiCoachScreen(key: ValueKey("ai_$_refreshCounter")),
+      ),
     ];
 
     return Scaffold(
@@ -101,7 +127,12 @@ class _MainNavigationContainerState extends State<MainNavigationContainer> {
               onTap: () async {
                 await Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => BlocProvider<ProfileCubit>(
+                      create: (context) => getIt<ProfileCubit>(),
+                      child: const ProfileScreen(),
+                    ),
+                  ),
                 );
                 _loadUserInfo();
                 setState(() {

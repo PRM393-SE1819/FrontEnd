@@ -2,10 +2,13 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../../../core/network/api_service.dart';
 import '../../../meal/presentation/screens/meal_tab.dart';
+import '../../domain/entities/chat_message.dart';
+import '../cubit/ai_coach_cubit.dart';
+import '../cubit/ai_coach_state.dart';
+import '../../../../core/network/api_service.dart';
 
 class AiCoachScreen extends StatefulWidget {
   const AiCoachScreen({super.key});
@@ -18,18 +21,8 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
   final ImagePicker _picker = ImagePicker();
-  static const _storage = FlutterSecureStorage();
 
-  bool _isLoading = false;
-  bool _isContextLoading = true;
-
-  final List<_ChatMessage> _messages = [];
-  final List<Map<String, dynamic>> _conversationHistory = [];
-  Map<String, dynamic>? _userContext;
-
-  // Tabs
   int _currentSubTab = 0; // 0 = AI Scan, 1 = AI Coach
-  List<Map<String, dynamic>> _recentScans = [];
 
   static const Color primaryGreen = Color(0xFF006D44);
   static const Color lightGreen = Color(0xFFE6F4EE);
@@ -38,160 +31,19 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUserContext();
-    _loadRecentScans();
+    context.read<AiCoachCubit>().loadInitialData();
   }
 
-  Future<void> _loadUserContext() async {
-    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    try {
-      final nutrition = await ApiService.getDailyNutritionSummary(today);
-      final weight = await ApiService.getWeightSummary();
-      final profile = await ApiService.getHealthProfile();
-      final conditions = await ApiService.getHealthConditions() ?? [];
-      final allergies = await ApiService.getAllergies() ?? [];
-      final waterSummary = await ApiService.getDailyWaterSummary(today);
-      final mealHistory = await ApiService.getMealHistory(date: today);
-
-      String conditionsStr = conditions.isEmpty
-          ? "Không có"
-          : conditions.map((c) {
-              final name = c['conditionName'] ?? '';
-              final notes = c['notes'] ?? '';
-              return notes.toString().isNotEmpty ? "$name ($notes)" : name;
-            }).join(", ");
-
-      String allergiesStr = allergies.isEmpty
-          ? "Không có"
-          : allergies.map((a) => a['allergyName'] ?? '').join(", ");
-
-      String mealsListStr = "Chưa có bữa ăn nào được ghi nhận hôm nay.";
-      if (mealHistory != null && mealHistory['items'] != null) {
-        final List<dynamic> items = mealHistory['items'];
-        if (items.isNotEmpty) {
-          final List<String> mealStrings = [];
-          for (var m in items) {
-            final type = m['mealType'] ?? 'Bữa ăn';
-            final totalCal = (m['totalCalories'] as num?)?.round() ?? 0;
-            final List<dynamic> foodItems = m['items'] ?? [];
-            final foodDetails = foodItems.map((f) => "${f['foodName']} (${(f['quantity'] as num).round()}g)").join(", ");
-            mealStrings.add("- $type ($totalCal kcal): $foodDetails");
-          }
-          mealsListStr = mealStrings.join("\n");
-        }
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
       }
-
-      setState(() {
-        _userContext = {
-          'calories': (nutrition?['caloriesConsumed'] as num?)?.round() ?? 0,
-          'calorieTarget': (nutrition?['caloriesTarget'] as num?)?.round() ?? 2000,
-          'protein': (nutrition?['proteinConsumed'] as num?)?.toStringAsFixed(1) ?? '0',
-          'proteinTarget': (nutrition?['proteinTarget'] as num?)?.round() ?? 150,
-          'carbs': (nutrition?['carbConsumed'] as num?)?.toStringAsFixed(1) ?? '0',
-          'carbTarget': (nutrition?['carbTarget'] as num?)?.round() ?? 250,
-          'fat': (nutrition?['fatConsumed'] as num?)?.toStringAsFixed(1) ?? '0',
-          'fatTarget': (nutrition?['fatTarget'] as num?)?.round() ?? 70,
-          'weight': (weight?['currentWeight'] as num?)?.toString() ?? 'N/A',
-          
-          'gender': profile?['gender'] ?? 'N/A',
-          'dateOfBirth': profile?['dateOfBirth'] ?? 'N/A',
-          'age': profile?['dateOfBirth'] != null 
-              ? (DateTime.now().year - DateTime.parse(profile!['dateOfBirth']).year).toString()
-              : 'N/A',
-          'height': profile?['height']?.toString() ?? 'N/A',
-          'activityLevel': profile?['activityLevel'] ?? 'N/A',
-          'goal': profile?['goal'] ?? 'N/A',
-          'targetWeight': profile?['targetWeight']?.toString() ?? 'N/A',
-          'bmi': profile?['bmi']?.toStringAsFixed(1) ?? 'N/A',
-          'bodyFat': profile?['bodyFat']?.toStringAsFixed(1) ?? 'N/A',
-          'conditions': conditionsStr,
-          'allergies': allergiesStr,
-          'waterConsumed': (waterSummary?['consumedML'] as num?)?.round() ?? 0,
-          'waterGoal': (waterSummary?['goalML'] as num?)?.round() ?? 2000,
-          'mealsList': mealsListStr,
-          'todayDate': today,
-        };
-        _isContextLoading = false;
-      });
-    } catch (e) {
-      if (kDebugMode) print("Error loading user context for AI Coach: $e");
-      setState(() => _isContextLoading = false);
-    }
-
-    // Add welcome message
-    _messages.add(_ChatMessage(
-      text: "Xin chào! Tôi là NutriAI, trợ lý dinh dưỡng AI của bạn 🥗\n\nTôi có thể giúp bạn:\n• Tư vấn chế độ ăn uống cá nhân\n• Phân tích dữ liệu dinh dưỡng hôm nay\n• Gợi ý thực đơn và món ăn lành mạnh\n• Giải thích về protein, carbs, fat\n• Hỗ trợ đạt mục tiêu cân nặng\n\nHỏi tôi bất cứ điều gì về dinh dưỡng của bạn!",
-      isUser: false,
-      timestamp: DateTime.now(),
-    ));
-    setState(() {});
-  }
-
-  Future<void> _loadRecentScans() async {
-    try {
-      final jsonStr = await _storage.read(key: 'recent_scans');
-      if (jsonStr != null) {
-        final List<dynamic> list = jsonDecode(jsonStr);
-        setState(() {
-          _recentScans = list
-              .map((e) => Map<String, dynamic>.from(e))
-              .where((item) => item['id'] != 'demo1' && item['id'] != 'demo2')
-              .toList();
-        });
-      } else {
-        setState(() {
-          _recentScans = [];
-        });
-      }
-    } catch (e) {
-      debugPrint("Error loading recent scans: $e");
-    }
-  }
-
-  Future<void> _saveRecentScan(String foodName, Map<String, dynamic> fullResult, {String? imageBase64}) async {
-    try {
-      final nutrition = fullResult['total_nutrition'] ?? {};
-      final calories = (nutrition['calories'] as num?)?.toInt() ?? 0;
-      final protein = (nutrition['protein'] as num?)?.toDouble() ?? 0.0;
-      final carbs = (nutrition['carbs'] as num?)?.toDouble() ?? 0.0;
-      final fat = (nutrition['fat'] as num?)?.toDouble() ?? 0.0;
-
-      String imageName = 'fallback';
-      final lowerName = foodName.toLowerCase();
-      if (lowerName.contains('salmon') || lowerName.contains('cá hồi')) imageName = 'salmon';
-      else if (lowerName.contains('salad') || lowerName.contains('bơ') || lowerName.contains('avocado')) imageName = 'salad';
-      else if (lowerName.contains('pho') || lowerName.contains('phở') || lowerName.contains('noodle')) imageName = 'pho';
-      else if (lowerName.contains('banh mi') || lowerName.contains('bánh mì') || lowerName.contains('sandwich')) imageName = 'banh_mi';
-      else if (lowerName.contains('pizza')) imageName = 'pizza';
-      else if (lowerName.contains('burger')) imageName = 'burger';
-      else if (lowerName.contains('chicken') || lowerName.contains('gà')) imageName = 'chicken';
-      else if (lowerName.contains('rice') || lowerName.contains('cơm')) imageName = 'com_tam';
-      else if (lowerName.contains('beef') || lowerName.contains('bò') || lowerName.contains('steak')) imageName = 'beef';
-
-      final newScan = {
-        "id": DateTime.now().millisecondsSinceEpoch.toString(),
-        "foodName": foodName,
-        "calories": calories,
-        "protein": protein,
-        "carbs": carbs,
-        "fat": fat,
-        "time": "Hôm nay, ${DateFormat('h:mm a').format(DateTime.now())}",
-        "date": DateTime.now().toIso8601String(),
-        "imageName": imageName,
-        if (imageBase64 != null) "imageBase64": imageBase64,
-        "fullResult": fullResult
-      };
-
-      _recentScans.insert(0, newScan);
-      if (_recentScans.length > 10) {
-        _recentScans = _recentScans.sublist(0, 10);
-      }
-
-      await _storage.write(key: 'recent_scans', value: jsonEncode(_recentScans));
-      setState(() {});
-    } catch (e) {
-      debugPrint("Error saving recent scan: $e");
-    }
+    });
   }
 
   String _getImageUrlForName(String imageName) {
@@ -210,69 +62,14 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
     return images[imageName] ?? images['fallback']!;
   }
 
-  Future<void> _sendMessage() async {
+  void _sendMessage() {
     final text = _messageController.text.trim();
-    if (text.isEmpty || _isLoading) return;
+    if (text.isEmpty) return;
 
     _messageController.clear();
-    FocusScope.of(context).unfocus(); // Dismiss the keyboard
-    setState(() {
-      _messages.add(_ChatMessage(text: text, isUser: true, timestamp: DateTime.now()));
-      _isLoading = true;
-    });
+    FocusScope.of(context).unfocus();
+    context.read<AiCoachCubit>().sendMessage(text);
     _scrollToBottom();
-
-    final reply = await ApiService.sendAiNutritionMessage(
-      userMessage: text,
-      conversationHistory: _conversationHistory,
-      userContext: _userContext,
-    );
-
-    _conversationHistory.add({"role": "user", "content": text});
-
-    if (reply != null) {
-      final content = reply['content'] as String? ?? '';
-      final reasoning = reply['reasoning_details'] as String?;
-
-      _conversationHistory.add({
-        "role": "assistant",
-        "content": content,
-        if (reasoning != null) "reasoning_details": reasoning,
-      });
-
-      setState(() {
-        _messages.add(_ChatMessage(
-          text: content,
-          isUser: false,
-          timestamp: DateTime.now(),
-          reasoning: reasoning,
-        ));
-        _isLoading = false;
-      });
-    } else {
-      setState(() {
-        _messages.add(_ChatMessage(
-          text: "Xin lỗi, tôi không thể kết nối được lúc này. Vui lòng thử lại sau.",
-          isUser: false,
-          timestamp: DateTime.now(),
-          isError: true,
-        ));
-        _isLoading = false;
-      });
-    }
-    _scrollToBottom();
-  }
-
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
   }
 
   Future<void> _pickAndScanFoodImage({ImageSource? preferredSource}) async {
@@ -316,136 +113,14 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
     final bytes = await image.readAsBytes();
     final base64Data = base64Encode(bytes);
 
-    // Add user's uploaded image to chat immediately
-    setState(() {
-      _messages.add(_ChatMessage(
-        text: "[Hình ảnh món ăn]",
-        isUser: true,
-        timestamp: DateTime.now(),
-        imageBytes: bytes,
-      ));
-    });
-    _scrollToBottom();
-
-    _showLoadingDialog("Đang quét món ăn...");
-
-    // Send image to OpenRouter vision model
-    final reply = await ApiService.analyzeFoodImage(
-      imageBase64: base64Data,
-      mimeType: image.mimeType ?? 'image/jpeg',
-      userContext: _userContext,
-    );
-
     if (mounted) {
-      Navigator.pop(context); // Close loading dialog
+      context.read<AiCoachCubit>().scanFoodImage(
+            base64Data,
+            image.mimeType ?? 'image/jpeg',
+            bytes,
+          );
     }
-
-    if (reply != null) {
-      _conversationHistory.add({"role": "user", "content": "[User uploaded a food image for analysis]"});
-      _conversationHistory.add({"role": "assistant", "content": reply});
-
-      Map<String, dynamic>? parsedJson;
-      try {
-        String cleaned = reply.trim();
-        if (cleaned.startsWith("```")) {
-          final lines = cleaned.split("\n");
-          if (lines.first.startsWith("```json") || lines.first.startsWith("```")) {
-            lines.removeAt(0);
-          }
-          if (lines.isNotEmpty && lines.last.startsWith("```")) {
-            lines.removeLast();
-          }
-          cleaned = lines.join("\n").trim();
-        }
-        parsedJson = jsonDecode(cleaned) as Map<String, dynamic>;
-      } catch (e) {
-        debugPrint("Failed to parse vision response as JSON: $e");
-      }
-
-      if (parsedJson != null && parsedJson['success'] == true) {
-        final items = parsedJson['items'] as List<dynamic>? ?? [];
-        String foodName = "Món ăn";
-        if (items.isNotEmpty) {
-          foodName = items[0]['name_vi'] ?? items[0]['name'] ?? 'Món ăn';
-        }
-        
-        await _saveRecentScan(foodName, parsedJson, imageBase64: base64Data);
-
-        // Inject imageBase64 into parsedJson so the bottom sheet has it
-        parsedJson['imageBase64'] = base64Data;
-
-        // Sync scan results to the chat assistant messages
-        setState(() {
-          _messages.add(_ChatMessage(
-            text: parsedJson!['message'] ?? "Đã quét thành công",
-            isUser: false,
-            timestamp: DateTime.now(),
-            foodScanResult: parsedJson,
-          ));
-        });
-        _scrollToBottom();
-
-        _showScanResultBottomSheet(parsedJson);
-      } else {
-        final errorMsg = parsedJson?['message'] ?? "Không thể phân tích dữ liệu hình ảnh. Vui lòng thử lại với ảnh rõ nét hơn.";
-        setState(() {
-          _messages.add(_ChatMessage(
-            text: errorMsg,
-            isUser: false,
-            timestamp: DateTime.now(),
-            isError: true,
-          ));
-        });
-        _scrollToBottom();
-        _showScanErrorDialog(errorMsg);
-      }
-    } else {
-      const errorMsg = "Có lỗi kết nối khi phân tích ảnh thức ăn.";
-      setState(() {
-        _messages.add(_ChatMessage(
-          text: errorMsg,
-          isUser: false,
-          timestamp: DateTime.now(),
-          isError: true,
-        ));
-      });
-      _scrollToBottom();
-      _showScanErrorDialog(errorMsg);
-    }
-  }
-
-  void _showLoadingDialog(String message) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return PopScope(
-          canPop: false,
-          child: AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 10),
-                const CircularProgressIndicator(color: primaryGreen),
-                const SizedBox(height: 20),
-                Text(
-                  message,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "NutriAI đang phân tích hình ảnh và tính toán dinh dưỡng...",
-                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+    _scrollToBottom();
   }
 
   void _showScanErrorDialog(String errorMsg) {
@@ -695,9 +370,9 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogCtx) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
+          builder: (dialogCtx, setDialogState) {
             return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               title: const Text("Thêm vào nhật ký bữa ăn", style: TextStyle(fontWeight: FontWeight.bold)),
@@ -738,7 +413,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => Navigator.pop(dialogCtx),
                   child: const Text("Hủy", style: TextStyle(color: Colors.grey)),
                 ),
                 ElevatedButton(
@@ -756,28 +431,8 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                       ]
                     };
 
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (context) => const Center(child: CircularProgressIndicator()),
-                    );
-
-                    final res = await ApiService.addMeal(mealData);
-                    if (context.mounted) {
-                      Navigator.pop(context); // Close loading
-                      Navigator.pop(context); // Close dialog
-                    }
-
-                    if (res != null) {
-                      _loadUserContext(); // Refresh metrics bar
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text("Đã thêm món ăn thành công!"),
-                          backgroundColor: primaryGreen,
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    }
+                    Navigator.pop(dialogCtx); // Close Dialog
+                    context.read<AiCoachCubit>().addScannedMeal(mealData);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryGreen,
@@ -1116,9 +771,9 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogCtx) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
+          builder: (dialogCtx, setDialogState) {
             return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               title: const Text("Chọn bữa ăn muốn lưu", style: TextStyle(fontWeight: FontWeight.bold)),
@@ -1149,12 +804,12 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => Navigator.pop(dialogCtx),
                   child: const Text("Hủy", style: TextStyle(color: Colors.grey)),
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    Navigator.pop(context);
+                    Navigator.pop(dialogCtx);
                     _logScannedMealToDbMultiple(res, selectedMealType);
                   },
                   style: ElevatedButton.styleFrom(
@@ -1172,15 +827,21 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
   }
 
   Future<void> _logScannedMealToDbMultiple(Map<String, dynamic> scanResult, String mealType) async {
-    _showLoadingDialog("Đang đồng bộ món ăn...");
+    final itemsList = scanResult['items'] as List<dynamic>? ?? [];
+    if (itemsList.isEmpty) return;
+
+    final overlayState = Overlay.of(context);
+    final overlayEntry = OverlayEntry(
+      builder: (context) => Container(
+        color: Colors.black.withOpacity(0.3),
+        child: const Center(
+          child: CircularProgressIndicator(color: primaryGreen),
+        ),
+      ),
+    );
+    overlayState.insert(overlayEntry);
 
     try {
-      final itemsList = scanResult['items'] as List<dynamic>? ?? [];
-      if (itemsList.isEmpty) {
-        if (mounted) Navigator.pop(context);
-        return;
-      }
-
       final List<Map<String, dynamic>> mealItems = [];
 
       for (final item in itemsList) {
@@ -1241,7 +902,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
         }
       }
 
-      if (mounted) Navigator.pop(context); // Close loading dialog
+      overlayEntry.remove();
 
       if (mealItems.isNotEmpty) {
         final mealData = {
@@ -1251,22 +912,9 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
           "items": mealItems
         };
 
-        final res = await ApiService.addMeal(mealData);
-
-        if (res != null) {
-          _loadUserContext(); // Update context values on UI
+        if (mounted) {
+          context.read<AiCoachCubit>().addScannedMeal(mealData);
           MealTab.onReload?.call();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Đã lưu vào nhật ký $mealType thành công!"),
-              backgroundColor: primaryGreen,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Không thể ghi nhận nhật ký bữa ăn.")),
-          );
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1274,7 +922,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
         );
       }
     } catch (e) {
-      if (mounted) Navigator.pop(context);
+      overlayEntry.remove();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Có lỗi xảy ra: $e")),
       );
@@ -1283,10 +931,22 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
 
   Future<void> _estimateCaloriesFromText(String description) async {
     if (description.trim().isEmpty) return;
-    FocusScope.of(context).unfocus(); // Dismiss the keyboard
-    _showLoadingDialog("Đang ước tính calo...");
+    FocusScope.of(context).unfocus();
+
+    final overlayState = Overlay.of(context);
+    final overlayEntry = OverlayEntry(
+      builder: (context) => Container(
+        color: Colors.black.withOpacity(0.3),
+        child: const Center(
+          child: CircularProgressIndicator(color: primaryGreen),
+        ),
+      ),
+    );
+    overlayState.insert(overlayEntry);
+
     final res = await ApiService.estimateCalories(description.trim());
-    if (mounted) Navigator.pop(context);
+    overlayEntry.remove();
+
     if (res != null) {
       final cal = (res['estimatedCalories'] as num?)?.toInt() ?? 0;
       final protein = (res['protein'] as num?)?.toDouble() ?? 0.0;
@@ -1294,6 +954,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
       final fat = (res['fat'] as num?)?.toDouble() ?? 0.0;
       final food = res['foodName'] ?? description;
       final advice = res['advice'] ?? '';
+      
       final scanResult = {
         'success': true,
         'message': 'Ước tính: $food',
@@ -1301,24 +962,26 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
         'total_nutrition': {'calories': cal, 'protein': protein, 'carbs': carbs, 'fat': fat, 'fiber': 0.0, 'sodium': 0.0},
         'items': [
           {
-            'name_vi': food, 'name_en': food, 'portion_size': '1 phần', 'portion_multiplier': 1.0, 'weight_grams': 100.0,
+            'name_vi': food,
+            'name_en': food,
+            'portion_size': '1 phần',
+            'portion_multiplier': 1.0,
+            'weight_grams': 100.0,
             'nutrition': {'calories': cal, 'protein': protein, 'carbs': carbs, 'fat': fat, 'fiber': 0.0, 'sodium': 0.0},
-            'ingredients': [], 'dietary_flags': {'vegetarian': false, 'vegan': false, 'gluten_free': false, 'high_protein': protein >= 20.0},
+            'ingredients': [],
+            'dietary_flags': {'vegetarian': false, 'vegan': false, 'gluten_free': false, 'high_protein': protein >= 20.0},
           }
         ],
         'alternatives': [],
         'health_rating': 'Tốt',
         'advice': advice,
       };
-      await _saveRecentScan(food, scanResult);
-      setState(() {
-        _messages.add(_ChatMessage(
-          text: 'Ước tính: $food — $cal kcal',
-          isUser: false,
-          timestamp: DateTime.now(),
-          foodScanResult: scanResult,
-        ));
-      });
+
+      if (mounted) {
+        context.read<AiCoachCubit>().saveRecentScan(food, scanResult);
+        // Add fake scan response to UI conversation logs
+        context.read<AiCoachCubit>().sendMessage("Hãy ước tính lượng Calo trong món: $description");
+      }
       _showScanResultBottomSheet(scanResult);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1329,118 +992,189 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: darkBg,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: Row(
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF006D44), Color(0xFF00A86B)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+    return BlocConsumer<AiCoachCubit, AiCoachState>(
+      listener: (context, state) {
+        if (state is AiCoachLoaded) {
+          if (state.toastMessage != null) {
+            final msg = state.toastMessage!;
+            if (msg.startsWith("SCAN_SUCCESS:")) {
+              final jsonStr = msg.substring("SCAN_SUCCESS:".length);
+              final parsed = jsonDecode(jsonStr);
+              _showScanResultBottomSheet(parsed);
+            } else if (msg.startsWith("SCAN_ERROR:")) {
+              final err = msg.substring("SCAN_ERROR:".length);
+              _showScanErrorDialog(err);
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(msg),
+                  backgroundColor: primaryGreen,
+                  behavior: SnackBarBehavior.floating,
                 ),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                _currentSubTab == 0 ? Icons.auto_awesome : Icons.psychology_alt,
-                color: Colors.white,
-                size: 22,
+              );
+            }
+          }
+        }
+      },
+      builder: (context, state) {
+        if (state is AiCoachInitial || state is AiCoachLoading) {
+          return const Scaffold(
+            backgroundColor: darkBg,
+            body: Center(child: CircularProgressIndicator(color: primaryGreen)),
+          );
+        }
+
+        if (state is AiCoachError) {
+          return Scaffold(
+            backgroundColor: darkBg,
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Text(
+                  state.message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.redAccent, fontSize: 16),
+                ),
               ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          );
+        }
+
+        if (state is AiCoachLoaded) {
+          final userContext = state.userContext;
+
+          return Scaffold(
+            backgroundColor: darkBg,
+            appBar: AppBar(
+              backgroundColor: Colors.white,
+              elevation: 0,
+              title: Row(
                 children: [
-                  Text(
-                    _currentSubTab == 0 ? "Phân tích Bữa ăn AI" : "Trợ lý Dinh dưỡng AI",
-                    style: const TextStyle(
-                      color: Color(0xFF2D3748),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF006D44), Color(0xFF00A86B)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      _currentSubTab == 0 ? Icons.auto_awesome : Icons.psychology_alt,
+                      color: Colors.white,
+                      size: 22,
                     ),
                   ),
-                  Row(
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF00A86B),
-                          shape: BoxShape.circle,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _currentSubTab == 0 ? "Phân tích Bữa ăn AI" : "Trợ lý Dinh dưỡng AI",
+                          style: const TextStyle(
+                            color: Color(0xFF2D3748),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        "Online • NutriAI",
-                        style: TextStyle(color: Colors.grey[500], fontSize: 11),
-                      ),
-                    ],
+                        Row(
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF00A86B),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              "Online • NutriAI",
+                              style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-            ),
-          ],
-        ),
-        actions: [
-          if (!_isContextLoading && _userContext != null)
-            IconButton(
-              icon: const Icon(Icons.info_outline, color: primaryGreen),
-              tooltip: "Dinh dưỡng hôm nay",
-              onPressed: _showContextPanel,
-            ),
-          if (_currentSubTab == 1)
-            IconButton(
-              icon: const Icon(Icons.delete_sweep_outlined, color: Colors.redAccent),
-              tooltip: 'Xóa lịch sử chat',
-              onPressed: () async {
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('Xóa lịch sử chat'),
-                    content: const Text('Bạn có chắc muốn xóa toàn bộ lịch sử hội thoại không?'),
-                    actions: [
-                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
-                      ElevatedButton(
-                        onPressed: () => Navigator.pop(ctx, true),
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-                        child: const Text('Xóa', style: TextStyle(color: Colors.white)),
-                      ),
-                    ],
+              actions: [
+                if (userContext != null)
+                  IconButton(
+                    icon: const Icon(Icons.info_outline, color: primaryGreen),
+                    tooltip: "Dinh dưỡng hôm nay",
+                    onPressed: () => _showContextPanel(userContext),
                   ),
-                );
-                if (confirm == true) {
-                  await ApiService.deleteAllChatHistory();
-                  setState(() {
-                    _messages.clear();
-                    _conversationHistory.clear();
-                    _messages.add(_ChatMessage(
-                      text: "Lịch sử đã được xóa. Tôi sẵn sàng hỗ trợ bạn!",
-                      isUser: false,
-                      timestamp: DateTime.now(),
-                    ));
-                  });
-                }
-              },
+                if (_currentSubTab == 1)
+                  IconButton(
+                    icon: const Icon(Icons.delete_sweep_outlined, color: Colors.redAccent),
+                    tooltip: 'Xóa lịch sử chat',
+                    onPressed: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Xóa lịch sử chat'),
+                          content: const Text('Bạn có chắc muốn xóa toàn bộ lịch sử hội thoại không?'),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                              child: const Text('Xóa', style: TextStyle(color: Colors.white)),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) {
+                        await ApiService.deleteAllChatHistory();
+                        if (mounted) {
+                          context.read<AiCoachCubit>().loadInitialData();
+                        }
+                      }
+                    },
+                  ),
+              ],
             ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Sub-Tab Switcher
-          _buildTabSwitcher(),
-          
-          Expanded(
-            child: _currentSubTab == 0 ? _buildScanTab() : _buildChatTab(),
-          ),
-        ],
-      ),
+            body: Stack(
+              children: [
+                Column(
+                  children: [
+                    _buildTabSwitcher(),
+                    Expanded(
+                      child: _currentSubTab == 0 ? _buildScanTab(state) : _buildChatTab(state),
+                    ),
+                  ],
+                ),
+                if (state.isOperationLoading)
+                  Container(
+                    color: Colors.black.withOpacity(0.2),
+                    child: const Center(
+                      child: Card(
+                        child: Padding(
+                          padding: EdgeInsets.all(24.0),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircularProgressIndicator(color: primaryGreen),
+                              SizedBox(height: 16),
+                              Text("Đang xử lý hình ảnh món ăn..."),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        }
+
+        return const SizedBox.shrink();
+      },
     );
   }
 
@@ -1519,7 +1253,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
     );
   }
 
-  Widget _buildScanTab() {
+  Widget _buildScanTab(AiCoachLoaded state) {
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       child: Column(
@@ -1687,7 +1421,6 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
           ),
           const SizedBox(height: 20),
 
-          // ── AI Calorie Estimate (text-based, always works) ──
           AnimatedFadeSlide(
             delay: 300,
             child: Padding(
@@ -1843,7 +1576,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
           const SizedBox(height: 12),
           AnimatedFadeSlide(
             delay: 600,
-            child: _recentScans.isEmpty
+            child: state.recentScans.isEmpty
               ? Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(40),
@@ -1864,9 +1597,9 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.only(left: 20, right: 8),
-                    itemCount: _recentScans.length,
+                    itemCount: state.recentScans.length,
                     itemBuilder: (context, index) {
-                      final scan = _recentScans[index];
+                      final scan = state.recentScans[index];
                       final foodName = scan['foodName'] ?? 'Món ăn';
                       
                       final dateStr = scan['date'] as String?;
@@ -1882,9 +1615,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                           } else {
                             time = DateFormat('dd/MM, HH:mm').format(date);
                           }
-                        } catch (e) {
-                          // fallback
-                        }
+                        } catch (_) {}
                       }
 
                       final calories = scan['calories'] ?? 0;
@@ -2035,21 +1766,23 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
     );
   }
 
-  Widget _buildChatTab() {
+  Widget _buildChatTab(AiCoachLoaded state) {
+    final userContext = state.userContext;
+
     return Column(
       children: [
-        if (!_isContextLoading && _userContext != null) _buildContextBar(),
+        if (userContext != null) _buildContextBar(userContext),
         _buildQuickPrompts(),
         Expanded(
           child: ListView.builder(
             controller: _scrollController,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            itemCount: _messages.length + (_isLoading ? 1 : 0),
+            itemCount: state.messages.length + (state.isChatLoading ? 1 : 0),
             itemBuilder: (context, index) {
-              if (index == _messages.length) {
+              if (index == state.messages.length) {
                 return _buildTypingIndicator();
               }
-              return _buildMessageBubble(_messages[index]);
+              return _buildMessageBubble(state.messages[index]);
             },
           ),
         ),
@@ -2058,9 +1791,9 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
     );
   }
 
-  Widget _buildContextBar() {
-    final cal = _userContext!['calories'] ?? 0;
-    final calTarget = _userContext!['calorieTarget'] ?? 2000;
+  Widget _buildContextBar(Map<String, dynamic> userContext) {
+    final cal = userContext['calories'] ?? 0;
+    final calTarget = userContext['calorieTarget'] ?? 2000;
     final pct = calTarget > 0 ? (cal / calTarget).clamp(0.0, 1.0) : 0.0;
 
     return LayoutBuilder(
@@ -2097,7 +1830,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                       ],
                     ),
                     Text(
-                      "P: ${_userContext!['protein']}g C: ${_userContext!['carbs']}g F: ${_userContext!['fat']}g",
+                      "P: ${userContext['protein']}g C: ${userContext['carbs']}g F: ${userContext['fat']}g",
                       style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                     ),
                   ],
@@ -2145,7 +1878,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
               ),
               const SizedBox(width: 8),
               Text(
-                "P: ${_userContext!['protein']}g  C: ${_userContext!['carbs']}g  F: ${_userContext!['fat']}g",
+                "P: ${userContext['protein']}g  C: ${userContext['carbs']}g  F: ${userContext['fat']}g",
                 style: TextStyle(fontSize: 11, color: Colors.grey[600]),
               ),
             ],
@@ -2185,7 +1918,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
     );
   }
 
-  Widget _buildMessageBubble(_ChatMessage msg) {
+  Widget _buildMessageBubble(ChatMessage msg) {
     return AnimatedFadeSlide(
       delay: 50,
       child: Padding(
@@ -2451,7 +2184,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
     );
   }
 
-  void _showContextPanel() {
+  void _showContextPanel(Map<String, dynamic> userContext) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -2474,14 +2207,14 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
               ),
               const SizedBox(height: 20),
               _contextRow(Icons.local_fire_department, "Calories",
-                  "${_userContext!['calories']} / ${_userContext!['calorieTarget']} kcal", Colors.orange),
+                  "${userContext['calories']} / ${userContext['calorieTarget']} kcal", Colors.orange),
               _contextRow(Icons.fitness_center, "Protein",
-                  "${_userContext!['protein']}g / ${_userContext!['proteinTarget']}g", Colors.red.shade400),
+                  "${userContext['protein']}g / ${userContext['proteinTarget']}g", Colors.red.shade400),
               _contextRow(Icons.grain, "Carbs",
-                  "${_userContext!['carbs']}g / ${_userContext!['carbTarget']}g", Colors.amber.shade600),
+                  "${userContext['carbs']}g / ${userContext['carbTarget']}g", Colors.amber.shade600),
               _contextRow(Icons.water_drop, "Fat",
-                  "${_userContext!['fat']}g / ${_userContext!['fatTarget']}g", Colors.blue.shade400),
-              _contextRow(Icons.monitor_weight_outlined, "Weight", "${_userContext!['weight']} kg", primaryGreen),
+                  "${userContext['fat']}g / ${userContext['fatTarget']}g", Colors.blue.shade400),
+              _contextRow(Icons.monitor_weight_outlined, "Weight", "${userContext['weight']} kg", primaryGreen),
               const SizedBox(height: 20),
             ],
           ),
@@ -2562,34 +2295,6 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
       ),
     );
   }
-
-  @override
-  void dispose() {
-    _messageController.dispose();
-    _scrollController.dispose();
-    super.dispose();
-  }
-}
-
-class _ChatMessage {
-  final String text;
-  final bool isUser;
-  final DateTime timestamp;
-  final bool isError;
-  final Uint8List? imageBytes;
-  final Map<String, dynamic>? foodScanResult;
-  final String? reasoning;
-
-  _ChatMessage({
-    required this.text,
-    required this.isUser,
-    required this.timestamp,
-    this.isError = false,
-    // ignore: unused_element_parameter
-    this.imageBytes,
-    this.foodScanResult,
-    this.reasoning,
-  });
 }
 
 class ReasoningCollapseWidget extends StatefulWidget {
@@ -2707,6 +2412,5 @@ double parseServingWeight(String? servingSize) {
     final parsed = double.tryParse(match.group(1) ?? '');
     if (parsed != null && parsed > 0) return parsed;
   }
-  return 1.0; // Fallback to 1 (e.g. "portion", "serving", "phần", "cái")
+  return 1.0; // Fallback
 }
-
