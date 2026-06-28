@@ -41,8 +41,12 @@ class WaterRemoteDataSource {
 
   Future<List<WaterLogModel>> getWaterLogHistory(String date) async {
     final headers = await _getHeaders();
+    var url = "${ApiConfig.baseUrl}/water/logs?page=1&pageSize=100";
+    if (date.isNotEmpty) {
+      url += "&date=$date";
+    }
     final response = await client.get(
-      Uri.parse("${ApiConfig.baseUrl}/water/logs?page=1&pageSize=100&date=$date"),
+      Uri.parse(url),
       headers: headers,
     );
     if (response.statusCode == 200) {
@@ -83,7 +87,7 @@ class WaterRemoteDataSource {
       headers: headers,
       body: jsonEncode({"amountML": amountML}),
     );
-    if (response.statusCode == 200) {
+    if (response.statusCode == 200 || response.statusCode == 201) {
       return WaterLogModel.fromJson(jsonDecode(response.body));
     }
     return null;
@@ -95,7 +99,7 @@ class WaterRemoteDataSource {
       Uri.parse("${ApiConfig.baseUrl}/water/logs/$logId"),
       headers: headers,
     );
-    return response.statusCode == 200;
+    return response.statusCode == 200 || response.statusCode == 204;
   }
 
   Future<WaterSummaryModel?> updateWaterGoal(double targetML) async {
@@ -105,7 +109,11 @@ class WaterRemoteDataSource {
       headers: headers,
       body: jsonEncode({"dailyTargetML": targetML}),
     );
-    if (response.statusCode == 200) {
+    if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 204) {
+      // If 204 No Content, return a dummy summary or fetch current summary
+      if (response.statusCode == 204 || response.body.isEmpty) {
+        return WaterSummaryModel(consumedML: 0, goalML: targetML);
+      }
       return WaterSummaryModel.fromJson(jsonDecode(response.body));
     }
     return null;
@@ -118,7 +126,7 @@ class WaterRemoteDataSource {
       headers: headers,
       body: jsonEncode({"reminderTime": timeOnlyStr}),
     );
-    if (response.statusCode == 200) {
+    if (response.statusCode == 200 || response.statusCode == 201) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
     return null;
@@ -130,6 +138,6 @@ class WaterRemoteDataSource {
       Uri.parse("${ApiConfig.baseUrl}/water/reminders/$reminderId"),
       headers: headers,
     );
-    return response.statusCode == 200;
+    return response.statusCode == 200 || response.statusCode == 204;
   }
 }

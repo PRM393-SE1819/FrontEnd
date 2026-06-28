@@ -671,60 +671,79 @@ class _WeightTabState extends State<WeightTab> {
                       elevation: 0,
                       margin: const EdgeInsets.only(bottom: 8),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: primaryGreen.withValues(alpha: 0.1),
-                          child: Icon(Icons.monitor_weight_outlined, color: primaryGreen, size: 20),
-                        ),
-                        title: Text('${weight.toStringAsFixed(1)} kg',
-                            style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(dateStr),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        child: Row(
                           children: [
-                            if (bodyFat != null)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: tealAccent.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text('${bodyFat.toStringAsFixed(1)}%',
-                                    style: TextStyle(
-                                        color: tealAccent, fontWeight: FontWeight.bold, fontSize: 12)),
-                              ),
-                            IconButton(
-                              icon: const Icon(Icons.edit_outlined, color: Colors.grey, size: 20),
-                              onPressed: () => _openLogWeightDialog(
-                                editLog: log,
-                                currentWeight: currentWeight,
-                                currentBodyFat: currentBodyFat,
+                            CircleAvatar(
+                              backgroundColor: primaryGreen.withValues(alpha: 0.1),
+                              child: Icon(Icons.monitor_weight_outlined, color: primaryGreen, size: 20),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${weight.toStringAsFixed(1)} kg',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    dateStr,
+                                    style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                                  ),
+                                ],
                               ),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
-                              onPressed: () async {
-                                final confirm = await showDialog<bool>(
-                                  context: context,
-                                  builder: (ctx) => AlertDialog(
-                                    title: const Text('Xóa nhật ký'),
-                                    content: const Text('Bạn có chắc muốn xóa lượt ghi nhận cân nặng này?'),
-                                    actions: [
-                                      TextButton(
-                                          onPressed: () => Navigator.pop(ctx, false),
-                                          child: const Text('Hủy', style: TextStyle(color: Colors.grey))),
-                                      ElevatedButton(
-                                        onPressed: () => Navigator.pop(ctx, true),
-                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-                                        child: const Text('Xóa', style: TextStyle(color: Colors.white)),
-                                      ),
-                                    ],
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (bodyFat != null)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: tealAccent.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text('${bodyFat.toStringAsFixed(1)}%',
+                                        style: TextStyle(
+                                            color: tealAccent, fontWeight: FontWeight.bold, fontSize: 12)),
                                   ),
-                                );
-                                if (confirm == true && context.mounted) {
-                                  context.read<WeightCubit>().deleteWeightLog(log.weightLogId);
-                                }
-                              },
+                                IconButton(
+                                  icon: const Icon(Icons.edit_outlined, color: Colors.grey, size: 20),
+                                  onPressed: () => _openLogWeightDialog(
+                                    editLog: log,
+                                    currentWeight: currentWeight,
+                                    currentBodyFat: currentBodyFat,
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                                  onPressed: () async {
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        title: const Text('Xóa nhật ký'),
+                                        content: const Text('Bạn có chắc muốn xóa lượt ghi nhận cân nặng này?'),
+                                        actions: [
+                                          TextButton(
+                                              onPressed: () => Navigator.pop(ctx, false),
+                                              child: const Text('Hủy', style: TextStyle(color: Colors.grey))),
+                                          ElevatedButton(
+                                            onPressed: () => Navigator.pop(ctx, true),
+                                            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                                            child: const Text('Xóa', style: TextStyle(color: Colors.white)),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirm == true && context.mounted) {
+                                      context.read<WeightCubit>().deleteWeightLog(log.weightLogId);
+                                    }
+                                  },
+                                ),
+                              ],
                             ),
                           ],
                         ),

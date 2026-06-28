@@ -4,7 +4,9 @@ import '../../domain/entities/water_reminder.dart';
 import '../../domain/entities/water_summary.dart';
 import '../../domain/repositories/water_repository.dart';
 import '../datasources/water_remote_data_source.dart';
+import '../models/water_log_model.dart';
 import '../models/water_reminder_model.dart';
+import '../models/water_summary_model.dart';
 
 class WaterRepositoryImpl implements WaterRepository {
   final WaterRemoteDataSource remoteDataSource;
@@ -17,12 +19,69 @@ class WaterRepositoryImpl implements WaterRepository {
 
   @override
   Future<WaterSummary> getDailyWaterSummary(String date) async {
-    return await remoteDataSource.getDailyWaterSummary(date);
+    // 1. Fetch the server daily summary to get the correct goalML
+    final serverSummary = await remoteDataSource.getDailyWaterSummary(date);
+    
+    // 2. Fetch the locally filtered logs to calculate correct consumedML
+    final logs = await getWaterLogHistory(date);
+    final consumedML = logs.fold<double>(0.0, (sum, log) => sum + log.amountML);
+
+    return WaterSummaryModel(
+      consumedML: consumedML,
+      goalML: serverSummary.goalML,
+    );
   }
 
   @override
   Future<List<WaterLog>> getWaterLogHistory(String date) async {
-    return await remoteDataSource.getWaterLogHistory(date);
+    final selectedDate = DateTime.parse(date);
+    final yesterdayDate = selectedDate.subtract(const Duration(days: 1));
+    final tomorrowDate = selectedDate.add(const Duration(days: 1));
+
+    final dateStr = selectedDate.toIso8601String().substring(0, 10);
+    final yesterdayStr = yesterdayDate.toIso8601String().substring(0, 10);
+    final tomorrowStr = tomorrowDate.toIso8601String().substring(0, 10);
+
+    List<WaterLogModel> logsToday = [];
+    List<WaterLogModel> logsYesterday = [];
+    List<WaterLogModel> logsTomorrow = [];
+    List<WaterLogModel> logsAll = [];
+
+    try {
+      logsToday = await remoteDataSource.getWaterLogHistory(dateStr);
+    } catch (_) {}
+    try {
+      logsYesterday = await remoteDataSource.getWaterLogHistory(yesterdayStr);
+    } catch (_) {}
+    try {
+      logsTomorrow = await remoteDataSource.getWaterLogHistory(tomorrowStr);
+    } catch (_) {}
+    try {
+      logsAll = await remoteDataSource.getWaterLogHistory("");
+    } catch (_) {}
+
+    final Map<int, WaterLog> uniqueLogs = {};
+
+    void addMatchingLogs(List<WaterLogModel> logs) {
+      for (final log in logs) {
+        final localTime = log.loggedAt;
+        if (localTime.year == selectedDate.year &&
+            localTime.month == selectedDate.month &&
+            localTime.day == selectedDate.day) {
+          uniqueLogs[log.waterLogId] = log;
+        }
+      }
+    }
+
+    addMatchingLogs(logsToday);
+    addMatchingLogs(logsYesterday);
+    addMatchingLogs(logsTomorrow);
+    addMatchingLogs(logsAll);
+
+    final sortedLogs = uniqueLogs.values.toList()
+      ..sort((a, b) => b.loggedAt.compareTo(a.loggedAt));
+
+    return sortedLogs;
   }
 
   @override

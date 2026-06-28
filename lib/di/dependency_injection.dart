@@ -52,7 +52,7 @@ import '../features/food/presentation/cubit/food_cubit.dart';
 
 final getIt = GetIt.instance;
 
-Future<void> setupDependencyInjection() async {
+void setupDependencyInjection() {
   // Core Services
   getIt.registerLazySingleton<http.Client>(() => http.Client());
   getIt.registerLazySingleton<FlutterSecureStorage>(() => const FlutterSecureStorage());
@@ -162,7 +162,7 @@ Future<void> setupDependencyInjection() async {
   getIt.registerLazySingleton<DashboardRepository>(() => DashboardRepositoryImpl(
         remoteDataSource: getIt<DashboardRemoteDataSource>(),
       ));
-  getIt.registerFactory<DashboardCubit>(() => DashboardCubit(
+  getIt.registerLazySingleton<DashboardCubit>(() => DashboardCubit(
         repository: getIt<DashboardRepository>(),
       ));
 

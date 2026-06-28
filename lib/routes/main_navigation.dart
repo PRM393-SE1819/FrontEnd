@@ -44,7 +44,6 @@ class _MainNavigationContainerState extends State<MainNavigationContainer> {
 
   @override
   void dispose() {
-    _dashboardCubit.close();
     super.dispose();
   }
 

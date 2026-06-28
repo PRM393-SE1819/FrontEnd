@@ -1,6 +1,8 @@
 import '../../domain/entities/dashboard_summary.dart';
 import '../../domain/repositories/dashboard_repository.dart';
 import '../datasources/dashboard_remote_datasource.dart';
+import '../../../water/domain/repositories/water_repository.dart';
+import '../../../../di/dependency_injection.dart';
 
 class DashboardRepositoryImpl implements DashboardRepository {
   final DashboardRemoteDataSource remoteDataSource;
@@ -17,7 +19,6 @@ class DashboardRepositoryImpl implements DashboardRepository {
       ]);
 
       final nutritionSummary = futures[0];
-      final waterSummary = futures[1];
       final weightSummary = futures[2];
 
       double caloriesConsumed = 0.0;
@@ -42,9 +43,16 @@ class DashboardRepositoryImpl implements DashboardRepository {
 
       double waterConsumed = 0.0;
       double waterGoal = 2000.0;
-      if (waterSummary != null) {
-        waterConsumed = (waterSummary['consumedML'] as num?)?.toDouble() ?? 0.0;
-        waterGoal = (waterSummary['goalML'] as num?)?.toDouble() ?? 2000.0;
+      try {
+        final waterSummary = await getIt<WaterRepository>().getDailyWaterSummary(dateStr);
+        waterConsumed = waterSummary.consumedML;
+        waterGoal = waterSummary.goalML;
+      } catch (_) {
+        final fallbackSummary = futures[1];
+        if (fallbackSummary != null) {
+          waterConsumed = (fallbackSummary['consumedML'] as num?)?.toDouble() ?? 0.0;
+          waterGoal = (fallbackSummary['goalML'] as num?)?.toDouble() ?? 2000.0;
+        }
       }
 
       double currentWeight = 0.0;

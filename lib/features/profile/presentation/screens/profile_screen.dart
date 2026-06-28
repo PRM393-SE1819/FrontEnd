@@ -569,21 +569,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   itemCount: allergies.length,
                   itemBuilder: (context, idx) {
                     final item = allergies[idx];
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.warning_amber_rounded, color: Colors.orange),
-                      title: Text(item.allergyName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text(item.notes ?? 'Không có chi tiết triệu chứng'),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Row(
                         children: [
-                          IconButton(
-                            icon: Icon(Icons.edit_outlined, color: primaryGreen, size: 20),
-                            onPressed: () => _openAddAllergyDialog(existing: item),
+                          const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 24),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.allergyName,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  item.notes ?? 'Không có chi tiết triệu chứng',
+                                  style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                                ),
+                              ],
+                            ),
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
-                            onPressed: () => context.read<ProfileCubit>().deleteAllergy(item.allergyId),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(Icons.edit_outlined, color: primaryGreen, size: 20),
+                                onPressed: () => _openAddAllergyDialog(existing: item),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                                onPressed: () => context.read<ProfileCubit>().deleteAllergy(item.allergyId),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -624,21 +643,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   itemCount: conditions.length,
                   itemBuilder: (context, idx) {
                     final item = conditions[idx];
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.favorite_border, color: Colors.redAccent),
-                      title: Text(item.conditionName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text(item.notes ?? 'Không có ghi chú'),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Row(
                         children: [
-                          IconButton(
-                            icon: Icon(Icons.edit_outlined, color: primaryGreen, size: 20),
-                            onPressed: () => _openAddConditionDialog(existing: item),
+                          const Icon(Icons.favorite_border, color: Colors.redAccent, size: 24),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.conditionName,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  item.notes ?? 'Không có ghi chú',
+                                  style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                                ),
+                              ],
+                            ),
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
-                            onPressed: () => context.read<ProfileCubit>().deleteHealthCondition(item.healthConditionId),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(Icons.edit_outlined, color: primaryGreen, size: 20),
+                                onPressed: () => _openAddConditionDialog(existing: item),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                                onPressed: () => context.read<ProfileCubit>().deleteHealthCondition(item.healthConditionId),
+                              ),
+                            ],
                           ),
                         ],
                       ),

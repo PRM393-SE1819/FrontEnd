@@ -529,39 +529,38 @@ class _WaterTabContentState extends State<WaterTabContent> {
                     final time = reminder.reminderTime;
                     final remId = reminder.reminderId;
                     final isEnabled = reminder.isEnabled;
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        isEnabled ? Icons.alarm : Icons.alarm_off,
-                        color: isEnabled ? waterBlue : Colors.grey,
-                        size: 20,
-                      ),
-                      title: Text(
-                        time,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: isEnabled ? const Color(0xFF2D3748) : Colors.grey,
-                          decoration: isEnabled ? null : TextDecoration.lineThrough,
-                        ),
-                      ),
-                      trailing: SizedBox(
-                        width: 110,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Switch(
-                              value: isEnabled,
-                              activeTrackColor: waterBlue,
-                              onChanged: (val) {
-                                context.read<WaterCubit>().toggleReminder(remId, val);
-                              },
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4.0),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isEnabled ? Icons.alarm : Icons.alarm_off,
+                            color: isEnabled ? waterBlue : Colors.grey,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              time,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: isEnabled ? const Color(0xFF2D3748) : Colors.grey,
+                                decoration: isEnabled ? null : TextDecoration.lineThrough,
+                              ),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                              onPressed: () => context.read<WaterCubit>().deleteReminder(remId),
-                            ),
-                          ],
-                        ),
+                          ),
+                          Switch(
+                            value: isEnabled,
+                            activeTrackColor: waterBlue,
+                            onChanged: (val) {
+                              context.read<WaterCubit>().toggleReminder(remId, val);
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                            onPressed: () => context.read<WaterCubit>().deleteReminder(remId),
+                          ),
+                        ],
                       ),
                     );
                   },
