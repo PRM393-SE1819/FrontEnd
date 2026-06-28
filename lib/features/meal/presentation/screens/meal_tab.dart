@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../cubit/meal_cubit.dart';
 import '../cubit/meal_state.dart';
+import '../../../dashboard/presentation/cubit/dashboard_cubit.dart';
 import '../../domain/entities/meal.dart';
 import '../../domain/entities/food.dart';
 
@@ -46,15 +47,15 @@ class _MealTabState extends State<MealTab> {
     super.dispose();
   }
 
-  Future<void> _selectDate(BuildContext context, DateTime currentDate) async {
+  Future<void> _selectDate(DateTime currentDate) async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: currentDate,
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
-      builder: (context, child) {
+      builder: (themeCtx, child) {
         return Theme(
-          data: Theme.of(context).copyWith(
+          data: Theme.of(themeCtx).copyWith(
             colorScheme: ColorScheme.light(
               primary: primaryGreen,
               onPrimary: Colors.white,
@@ -303,6 +304,7 @@ class _MealTabState extends State<MealTab> {
                   );
                 },
               ).then((selectedFood) {
+                if (!context.mounted) return;
                 if (selectedFood != null && selectedFood is Food) {
                   final qtyController = TextEditingController(text: "1");
                   showDialog(
@@ -356,7 +358,7 @@ class _MealTabState extends State<MealTab> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       DropdownButtonFormField<String>(
-                        value: selectedMealType,
+                        initialValue: selectedMealType,
                         decoration: InputDecoration(
                           labelText: "Loại bữa ăn",
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -488,6 +490,9 @@ class _MealTabState extends State<MealTab> {
     return BlocConsumer<MealCubit, MealState>(
       listener: (context, state) {
         if (state is MealLoaded && state.toastMessage != null) {
+          try {
+            context.read<DashboardCubit>().loadDashboardData(showLoading: false);
+          } catch (_) {}
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.toastMessage!),
@@ -542,7 +547,7 @@ class _MealTabState extends State<MealTab> {
                 ),
                 IconButton(
                   icon: Icon(Icons.calendar_today, color: primaryGreen),
-                  onPressed: () => _selectDate(context, date),
+                  onPressed: () => _selectDate(date),
                 ),
               ],
             ),
@@ -581,7 +586,7 @@ class _MealTabState extends State<MealTab> {
                 ),
                 if (state.isOperationLoading)
                   Container(
-                    color: Colors.black.withOpacity(0.2),
+                    color: Colors.black.withValues(alpha: 0.2),
                     child: const Center(child: CircularProgressIndicator()),
                   ),
               ],
@@ -633,7 +638,7 @@ class _MealTabState extends State<MealTab> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))
+          BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))
         ],
       ),
       child: Column(
@@ -803,7 +808,7 @@ class _MealTabState extends State<MealTab> {
       child: ExpansionTile(
         leading: Container(
           padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: iconColor.withOpacity(0.1), shape: BoxShape.circle),
+          decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.1), shape: BoxShape.circle),
           child: Icon(typeIcon, color: iconColor),
         ),
         title: Text(mealTypeMap[mealType] ?? mealType, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),

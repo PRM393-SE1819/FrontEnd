@@ -10,7 +10,7 @@ class ApiConfig {
   static const String localAndroidUrl = "http://10.0.2.2:1000/api";
 
   // Chuyển thành true để chạy local, false để dùng production
-  static const bool useLocal = true;
+  static const bool useLocal = false;
 
   static String get baseUrl {
     if (useLocal) {

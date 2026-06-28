@@ -13,6 +13,8 @@ import '../../../../core/network/api_service.dart';
 class AiCoachScreen extends StatefulWidget {
   const AiCoachScreen({super.key});
 
+  static void Function()? onReload;
+
   @override
   State<AiCoachScreen> createState() => _AiCoachScreenState();
 }
@@ -31,7 +33,19 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
   @override
   void initState() {
     super.initState();
-    context.read<AiCoachCubit>().loadInitialData();
+    final cubit = context.read<AiCoachCubit>();
+    AiCoachScreen.onReload = () {
+      cubit.reloadUserContext();
+    };
+    cubit.loadInitialData();
+  }
+
+  @override
+  void dispose() {
+    AiCoachScreen.onReload = null;
+    _messageController.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   void _scrollToBottom() {

@@ -1,5 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import '../../../../di/dependency_injection.dart';
+import '../../../dashboard/presentation/cubit/dashboard_cubit.dart';
 import '../../domain/repositories/water_repository.dart';
 import 'water_state.dart';
 
@@ -61,6 +63,9 @@ class WaterCubit extends Cubit<WaterState> {
           currentState.selectedDate,
           successMessage: "Đã ghi nhận +${amountML.round()} ml nước!",
         );
+        try {
+          getIt<DashboardCubit>().loadDashboardData(showLoading: false);
+        } catch (_) {}
       } else {
         emit(currentState.copyWith(
           isOperationLoading: false,
@@ -85,6 +90,9 @@ class WaterCubit extends Cubit<WaterState> {
           currentState.selectedDate,
           successMessage: "Đã xóa nhật ký uống nước thành công",
         );
+        try {
+          getIt<DashboardCubit>().loadDashboardData(showLoading: false);
+        } catch (_) {}
       } else {
         emit(currentState.copyWith(
           isOperationLoading: false,
@@ -109,6 +117,9 @@ class WaterCubit extends Cubit<WaterState> {
           currentState.selectedDate,
           successMessage: "Đã cập nhật mục tiêu thành công!",
         );
+        try {
+          getIt<DashboardCubit>().loadDashboardData(showLoading: false);
+        } catch (_) {}
       } else {
         emit(currentState.copyWith(
           isOperationLoading: false,

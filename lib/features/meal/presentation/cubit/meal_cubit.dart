@@ -1,5 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import '../../../../di/dependency_injection.dart';
+import '../../../dashboard/presentation/cubit/dashboard_cubit.dart';
 import '../../domain/repositories/meal_repository.dart';
 import '../../domain/entities/daily_calories_summary.dart';
 import '../../domain/entities/food.dart';
@@ -63,6 +65,9 @@ class MealCubit extends Cubit<MealState> {
             selectedDate: currentState.selectedDate,
             toastMessage: "Đã thêm bữa ăn thành công!",
           ));
+          try {
+            getIt<DashboardCubit>().loadDashboardData(showLoading: false);
+          } catch (_) {}
         } else {
           emit(currentState.copyWith(isOperationLoading: false, toastMessage: "Thêm bữa ăn thất bại."));
         }
@@ -89,6 +94,9 @@ class MealCubit extends Cubit<MealState> {
             selectedDate: currentState.selectedDate,
             toastMessage: "Đã cập nhật bữa ăn thành công!",
           ));
+          try {
+            getIt<DashboardCubit>().loadDashboardData(showLoading: false);
+          } catch (_) {}
         } else {
           emit(currentState.copyWith(isOperationLoading: false, toastMessage: "Cập nhật thất bại."));
         }
@@ -115,6 +123,9 @@ class MealCubit extends Cubit<MealState> {
             selectedDate: currentState.selectedDate,
             toastMessage: "Đã xóa bữa ăn thành công!",
           ));
+          try {
+            getIt<DashboardCubit>().loadDashboardData(showLoading: false);
+          } catch (_) {}
         } else {
           emit(currentState.copyWith(isOperationLoading: false, toastMessage: "Xóa thất bại."));
         }

@@ -3,6 +3,8 @@ import 'dart:typed_data';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:intl/intl.dart';
+import '../../../../di/dependency_injection.dart';
+import '../../../dashboard/presentation/cubit/dashboard_cubit.dart';
 import '../../domain/repositories/ai_coach_repository.dart';
 import '../../domain/entities/chat_message.dart';
 import 'ai_coach_state.dart';
@@ -229,51 +231,61 @@ class AiCoachCubit extends Cubit<AiCoachState> {
           userContext: currentState.userContext,
         );
 
-        if (reply != null) {
-          final content = reply['content'] as String? ?? '';
-          final reasoning = reply['reasoning_details'] as String?;
+        final latestState = state;
+        if (latestState is AiCoachLoaded) {
+          final newMessages = List<ChatMessage>.from(latestState.messages);
+          final newHistory = List<Map<String, dynamic>>.from(latestState.conversationHistory);
 
-          updatedHistory.add({
-            "role": "assistant",
-            "content": content,
-            if (reasoning != null) "reasoning_details": reasoning,
-          });
+          if (reply != null) {
+            final content = reply['content'] as String? ?? '';
+            final reasoning = reply['reasoning_details'] as String?;
 
-          updatedMessages.add(ChatMessage(
-            text: content,
-            isUser: false,
-            timestamp: DateTime.now(),
-            reasoning: reasoning,
-          ));
+            newHistory.add({
+              "role": "assistant",
+              "content": content,
+              if (reasoning != null) "reasoning_details": reasoning,
+            });
 
-          emit(currentState.copyWith(
-            messages: updatedMessages,
-            conversationHistory: updatedHistory,
-            isChatLoading: false,
-          ));
-        } else {
-          updatedMessages.add(ChatMessage(
-            text: "Xin lỗi, tôi không thể kết nối được lúc này. Vui lòng thử lại sau.",
+            newMessages.add(ChatMessage(
+              text: content,
+              isUser: false,
+              timestamp: DateTime.now(),
+              reasoning: reasoning,
+            ));
+
+            emit(latestState.copyWith(
+              messages: newMessages,
+              conversationHistory: newHistory,
+              isChatLoading: false,
+            ));
+          } else {
+            newMessages.add(ChatMessage(
+              text: "Xin lỗi, tôi không thể kết nối được lúc này. Vui lòng thử lại sau.",
+              isUser: false,
+              timestamp: DateTime.now(),
+              isError: true,
+            ));
+            emit(latestState.copyWith(
+              messages: newMessages,
+              isChatLoading: false,
+            ));
+          }
+        }
+      } catch (e) {
+        final latestState = state;
+        if (latestState is AiCoachLoaded) {
+          final newMessages = List<ChatMessage>.from(latestState.messages);
+          newMessages.add(ChatMessage(
+            text: "Có lỗi xảy ra: $e",
             isUser: false,
             timestamp: DateTime.now(),
             isError: true,
           ));
-          emit(currentState.copyWith(
-            messages: updatedMessages,
+          emit(latestState.copyWith(
+            messages: newMessages,
             isChatLoading: false,
           ));
         }
-      } catch (e) {
-        updatedMessages.add(ChatMessage(
-          text: "Có lỗi xảy ra: $e",
-          isUser: false,
-          timestamp: DateTime.now(),
-          isError: true,
-        ));
-        emit(currentState.copyWith(
-          messages: updatedMessages,
-          isChatLoading: false,
-        ));
       }
     }
   }
@@ -304,9 +316,6 @@ class AiCoachCubit extends Cubit<AiCoachState> {
         );
 
         if (replyStr != null) {
-          updatedHistory.add({"role": "user", "content": "[User uploaded a food image for analysis]"});
-          updatedHistory.add({"role": "assistant", "content": replyStr});
-
           Map<String, dynamic>? parsedJson;
           try {
             String cleaned = replyStr.trim();
@@ -335,60 +344,80 @@ class AiCoachCubit extends Cubit<AiCoachState> {
 
             parsedJson['imageBase64'] = imageBase64;
 
-            updatedMessages.add(ChatMessage(
-              text: parsedJson['message'] ?? "Đã quét thành công",
-              isUser: false,
-              timestamp: DateTime.now(),
-              foodScanResult: parsedJson,
-            ));
+            final latestState = state;
+            if (latestState is AiCoachLoaded) {
+              final newMessages = List<ChatMessage>.from(latestState.messages);
+              newMessages.add(ChatMessage(
+                text: parsedJson['message'] ?? "Đã quét thành công",
+                isUser: false,
+                timestamp: DateTime.now(),
+                foodScanResult: parsedJson,
+              ));
 
-            emit(currentState.copyWith(
-              messages: updatedMessages,
-              conversationHistory: updatedHistory,
-              isOperationLoading: false,
-              toastMessage: "SCAN_SUCCESS:${jsonEncode(parsedJson)}",
-            ));
+              final newHistory = List<Map<String, dynamic>>.from(latestState.conversationHistory);
+              newHistory.add({"role": "user", "content": "[User uploaded a food image for analysis]"});
+              newHistory.add({"role": "assistant", "content": replyStr});
+
+              emit(latestState.copyWith(
+                messages: newMessages,
+                conversationHistory: newHistory,
+                isOperationLoading: false,
+                toastMessage: "SCAN_SUCCESS:${jsonEncode(parsedJson)}",
+              ));
+            }
           } else {
             final errorMsg = parsedJson?['message'] ?? "Không thể phân tích dữ liệu hình ảnh. Vui lòng thử lại với ảnh rõ nét hơn.";
-            updatedMessages.add(ChatMessage(
+            final latestState = state;
+            if (latestState is AiCoachLoaded) {
+              final newMessages = List<ChatMessage>.from(latestState.messages);
+              newMessages.add(ChatMessage(
+                text: errorMsg,
+                isUser: false,
+                timestamp: DateTime.now(),
+                isError: true,
+              ));
+              emit(latestState.copyWith(
+                messages: newMessages,
+                isOperationLoading: false,
+                toastMessage: "SCAN_ERROR:$errorMsg",
+              ));
+            }
+          }
+        } else {
+          const errorMsg = "Có lỗi kết nối khi phân tích ảnh thức ăn.";
+          final latestState = state;
+          if (latestState is AiCoachLoaded) {
+            final newMessages = List<ChatMessage>.from(latestState.messages);
+            newMessages.add(ChatMessage(
               text: errorMsg,
               isUser: false,
               timestamp: DateTime.now(),
               isError: true,
             ));
-            emit(currentState.copyWith(
-              messages: updatedMessages,
+            emit(latestState.copyWith(
+              messages: newMessages,
               isOperationLoading: false,
               toastMessage: "SCAN_ERROR:$errorMsg",
             ));
           }
-        } else {
-          const errorMsg = "Có lỗi kết nối khi phân tích ảnh thức ăn.";
-          updatedMessages.add(ChatMessage(
+        }
+      } catch (e) {
+        final errorMsg = "Có lỗi xảy ra: $e";
+        final latestState = state;
+        if (latestState is AiCoachLoaded) {
+          final newMessages = List<ChatMessage>.from(latestState.messages);
+          newMessages.add(ChatMessage(
             text: errorMsg,
             isUser: false,
             timestamp: DateTime.now(),
             isError: true,
           ));
-          emit(currentState.copyWith(
-            messages: updatedMessages,
+          emit(latestState.copyWith(
+            messages: newMessages,
             isOperationLoading: false,
             toastMessage: "SCAN_ERROR:$errorMsg",
           ));
         }
-      } catch (e) {
-        final errorMsg = "Có lỗi xảy ra: $e";
-        updatedMessages.add(ChatMessage(
-          text: errorMsg,
-          isUser: false,
-          timestamp: DateTime.now(),
-          isError: true,
-        ));
-        emit(currentState.copyWith(
-          messages: updatedMessages,
-          isOperationLoading: false,
-          toastMessage: "SCAN_ERROR:$errorMsg",
-        ));
       }
     }
   }
@@ -399,23 +428,32 @@ class AiCoachCubit extends Cubit<AiCoachState> {
       emit(currentState.copyWith(isOperationLoading: true));
       try {
         final res = await repository.addMeal(mealData);
-        if (res != null) {
-          emit(currentState.copyWith(
-            isOperationLoading: false,
-            toastMessage: "Ghi nhận bữa ăn thành công!",
-          ));
-          await reloadUserContext();
-        } else {
-          emit(currentState.copyWith(
-            isOperationLoading: false,
-            toastMessage: "Không thể thêm bữa ăn. Vui lòng thử lại.",
-          ));
+        final latestState = state;
+        if (latestState is AiCoachLoaded) {
+          if (res != null) {
+            emit(latestState.copyWith(
+              isOperationLoading: false,
+              toastMessage: "Ghi nhận bữa ăn thành công!",
+            ));
+            await reloadUserContext();
+            try {
+              getIt<DashboardCubit>().loadDashboardData(showLoading: false);
+            } catch (_) {}
+          } else {
+            emit(latestState.copyWith(
+              isOperationLoading: false,
+              toastMessage: "Không thể thêm bữa ăn. Vui lòng thử lại.",
+            ));
+          }
         }
       } catch (e) {
-        emit(currentState.copyWith(
-          isOperationLoading: false,
-          toastMessage: "Lỗi: $e",
-        ));
+        final latestState = state;
+        if (latestState is AiCoachLoaded) {
+          emit(latestState.copyWith(
+            isOperationLoading: false,
+            toastMessage: "Lỗi: $e",
+          ));
+        }
       }
     }
   }

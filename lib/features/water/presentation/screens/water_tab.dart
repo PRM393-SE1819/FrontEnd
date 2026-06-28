@@ -6,6 +6,7 @@ import '../../../../di/dependency_injection.dart';
 import '../../domain/entities/water_log.dart';
 import '../../domain/entities/water_reminder.dart';
 import '../../domain/repositories/water_repository.dart';
+import '../../../dashboard/presentation/cubit/dashboard_cubit.dart';
 import '../cubit/water_cubit.dart';
 import '../cubit/water_state.dart';
 
@@ -200,6 +201,9 @@ class _WaterTabContentState extends State<WaterTabContent> {
           current is WaterLoaded && current.toastMessage != null,
       listener: (context, state) {
         if (state is WaterLoaded && state.toastMessage != null) {
+          try {
+            context.read<DashboardCubit>().loadDashboardData(showLoading: false);
+          } catch (_) {}
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.toastMessage!),

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../di/dependency_injection.dart';
+import '../../../dashboard/presentation/cubit/dashboard_cubit.dart';
 import '../../../meal/domain/entities/food.dart';
 import '../../../meal/domain/repositories/meal_repository.dart';
 import '../cubit/food_cubit.dart';
 import '../cubit/food_state.dart';
-import '../../../../routes/main_navigation.dart';
 import '../../../meal/presentation/screens/meal_tab.dart';
 
 class FoodTab extends StatefulWidget {
@@ -67,16 +67,18 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
   void _openBarcodeScanner() {
     showDialog<String>(
       context: context,
-      builder: (context) => const BarcodeScannerDialog(),
+      builder: (dialogCtx) => const BarcodeScannerDialog(),
     ).then((barcode) async {
       if (barcode != null && barcode.isNotEmpty) {
+        if (!mounted) return;
+        final foodCubit = context.read<FoodCubit>();
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (context) => const Center(child: CircularProgressIndicator()),
+          builder: (loaderCtx) => const Center(child: CircularProgressIndicator()),
         );
 
-        final food = await context.read<FoodCubit>().scanBarcode(barcode);
+        final food = await foodCubit.scanBarcode(barcode);
         if (!mounted) return;
         Navigator.pop(context); // Close loading dialog
 
@@ -101,101 +103,105 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
   }
 
   void _showFoodDetailsDialog(Food food) {
+    final foodCubit = context.read<FoodCubit>();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.7,
-          maxChildSize: 0.95,
-          minChildSize: 0.5,
-          expand: false,
-          builder: (context, scrollController) {
-            return BlocBuilder<FoodCubit, FoodState>(
-              builder: (context, state) {
-                final isFav = state is FoodSearchSuccess && state.favoriteFoods.any((f) => f.foodId == food.foodId);
-                return SingleChildScrollView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 50,
-                          height: 5,
-                          decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  food.name,
-                                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF2D3748)),
-                                ),
-                                if (food.servingSize != null)
-                                  Text(
-                                    "Khẩu phần: ${food.servingSize}",
-                                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                                  ),
-                              ],
-                            ),
+      builder: (modalContext) {
+        return BlocProvider.value(
+          value: foodCubit,
+          child: DraggableScrollableSheet(
+            initialChildSize: 0.7,
+            maxChildSize: 0.95,
+            minChildSize: 0.5,
+            expand: false,
+            builder: (sheetContext, scrollController) {
+              return BlocBuilder<FoodCubit, FoodState>(
+                builder: (builderContext, state) {
+                  final isFav = state is FoodSearchSuccess && state.favoriteFoods.any((f) => f.foodId == food.foodId);
+                  return SingleChildScrollView(
+                    controller: scrollController,
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 50,
+                            height: 5,
+                            decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)),
                           ),
-                          IconButton(
-                            icon: Icon(
-                              isFav ? Icons.favorite : Icons.favorite_border,
-                              color: isFav ? Colors.red : Colors.grey,
-                              size: 30,
-                            ),
-                            onPressed: () {
-                              _toggleFavorite(food);
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      if (food.description != null && food.description!.isNotEmpty) ...[
-                        Text(
-                          food.description!,
-                          style: TextStyle(fontSize: 15, color: Colors.grey[700], fontStyle: FontStyle.italic),
                         ),
                         const SizedBox(height: 20),
-                      ],
-                      _buildNutritionFactSheet(food),
-                      const SizedBox(height: 30),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _showAddToMealDialog(food);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryGreen,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    food.name,
+                                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF2D3748)),
+                                  ),
+                                  if (food.servingSize != null)
+                                    Text(
+                                      "Khẩu phần: ${food.servingSize}",
+                                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                isFav ? Icons.favorite : Icons.favorite_border,
+                                color: isFav ? Colors.red : Colors.grey,
+                                size: 30,
+                              ),
+                              onPressed: () {
+                                _toggleFavorite(food);
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        if (food.description != null && food.description!.isNotEmpty) ...[
+                          Text(
+                            food.description!,
+                            style: TextStyle(fontSize: 15, color: Colors.grey[700], fontStyle: FontStyle.italic),
                           ),
-                          child: const Text(
-                            "Thêm vào nhật ký ăn uống",
-                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                          const SizedBox(height: 20),
+                        ],
+                        _buildNutritionFactSheet(food),
+                        const SizedBox(height: 30),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(sheetContext);
+                              _showAddToMealDialog(food);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryGreen,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: const Text(
+                              "Thêm vào nhật ký ăn uống",
+                              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
-          },
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
         );
       },
     );
@@ -265,9 +271,9 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
+          builder: (builderContext, setDialogState) {
             return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               title: const Text("Ghi nhận bữa ăn", style: TextStyle(fontWeight: FontWeight.bold)),
@@ -275,7 +281,7 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   DropdownButtonFormField<String>(
-                    value: selectedMealType,
+                    initialValue: selectedMealType,
                     decoration: InputDecoration(
                       labelText: "Bữa ăn",
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -306,7 +312,7 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => Navigator.pop(dialogContext),
                   child: const Text("Hủy", style: TextStyle(color: Colors.grey)),
                 ),
                 ElevatedButton(
@@ -328,24 +334,31 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
                     showDialog(
                       context: context,
                       barrierDismissible: false,
-                      builder: (context) => const Center(child: CircularProgressIndicator()),
+                      builder: (loaderContext) => const Center(child: CircularProgressIndicator()),
                     );
 
                     final res = await getIt<MealRepository>().addMeal(mealData);
-                    if (context.mounted) {
+                    if (mounted) {
                       Navigator.pop(context); // Close loading
-                      Navigator.pop(context); // Close dialog
+                    }
+                    if (dialogContext.mounted) {
+                      Navigator.pop(dialogContext); // Close dialog
                     }
 
                     if (res != null) {
                       MealTab.onReload?.call();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text("Đã thêm món ăn vào ${mealTypeMap[selectedMealType]}!"),
-                          backgroundColor: primaryGreen,
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
+                      if (mounted) {
+                        try {
+                          context.read<DashboardCubit>().loadDashboardData(showLoading: false);
+                        } catch (_) {}
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text("Đã thêm món ăn vào ${mealTypeMap[selectedMealType]}!"),
+                            backgroundColor: primaryGreen,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
                     }
                   },
                   style: ElevatedButton.styleFrom(
@@ -372,111 +385,132 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
     final servingController = TextEditingController(text: existingFood?.servingSize ?? '100g');
     final barcodeController = TextEditingController(text: barcode ?? existingFood?.barcode ?? '');
 
+    final foodCubit = context.read<FoodCubit>();
+
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          scrollable: true,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text(
-            existingFood == null ? "Tạo món ăn tự tạo" : "Sửa món ăn tự tạo",
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: "Tên món ăn *"),
+      builder: (dialogContext) {
+        return BlocProvider.value(
+          value: foodCubit,
+          child: AlertDialog(
+            scrollable: true,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Text(
+              existingFood == null ? "Tạo món ăn tự tạo" : "Sửa món ăn tự tạo",
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            content: Builder(
+              builder: (builderContext) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(labelText: "Tên món ăn *"),
+                    ),
+                    TextField(
+                      controller: descController,
+                      decoration: const InputDecoration(labelText: "Mô tả"),
+                    ),
+                    TextField(
+                      controller: servingController,
+                      decoration: const InputDecoration(labelText: "Khẩu phần (vd: 100g, 1 lát)"),
+                    ),
+                    TextField(
+                      controller: calController,
+                      decoration: const InputDecoration(labelText: "Lượng Calo (kcal) *"),
+                      keyboardType: TextInputType.number,
+                    ),
+                    TextField(
+                      controller: protController,
+                      decoration: const InputDecoration(labelText: "Chất đạm (Protein) (g)"),
+                      keyboardType: TextInputType.number,
+                    ),
+                    TextField(
+                      controller: carbController,
+                      decoration: const InputDecoration(labelText: "Chất bột đường (Carbs) (g)"),
+                      keyboardType: TextInputType.number,
+                    ),
+                    TextField(
+                      controller: fatController,
+                      decoration: const InputDecoration(labelText: "Chất béo (Fats) (g)"),
+                      keyboardType: TextInputType.number,
+                    ),
+                    TextField(
+                      controller: barcodeController,
+                      decoration: const InputDecoration(labelText: "Mã vạch (Tùy chọn)"),
+                    ),
+                  ],
+                );
+              }
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text("Hủy", style: TextStyle(color: Colors.grey)),
               ),
-              TextField(
-                controller: descController,
-                decoration: const InputDecoration(labelText: "Mô tả"),
-              ),
-              TextField(
-                controller: servingController,
-                decoration: const InputDecoration(labelText: "Khẩu phần (vd: 100g, 1 lát)"),
-              ),
-              TextField(
-                controller: calController,
-                decoration: const InputDecoration(labelText: "Lượng Calo (kcal) *"),
-                keyboardType: TextInputType.number,
-              ),
-              TextField(
-                controller: protController,
-                decoration: const InputDecoration(labelText: "Chất đạm (Protein) (g)"),
-                keyboardType: TextInputType.number,
-              ),
-              TextField(
-                controller: carbController,
-                decoration: const InputDecoration(labelText: "Chất bột đường (Carbs) (g)"),
-                keyboardType: TextInputType.number,
-              ),
-              TextField(
-                controller: fatController,
-                decoration: const InputDecoration(labelText: "Chất béo (Fats) (g)"),
-                keyboardType: TextInputType.number,
-              ),
-              TextField(
-                controller: barcodeController,
-                decoration: const InputDecoration(labelText: "Mã vạch (Tùy chọn)"),
+              Builder(
+                builder: (btnContext) {
+                  return ElevatedButton(
+                    onPressed: () async {
+                      final name = nameController.text.trim();
+                      final cal = double.tryParse(calController.text) ?? 0.0;
+                      if (name.isEmpty) {
+                        ScaffoldMessenger.of(btnContext).showSnackBar(const SnackBar(content: Text("Vui lòng nhập tên món ăn")));
+                        return;
+                      }
+
+                      final foodData = {
+                        "name": name,
+                        "description": descController.text.trim(),
+                        "calories": cal,
+                        "protein": double.tryParse(protController.text) ?? 0.0,
+                        "carbs": double.tryParse(carbController.text) ?? 0.0,
+                        "fat": double.tryParse(fatController.text) ?? 0.0,
+                        "servingSize": servingController.text.trim(),
+                        "barcode": barcodeController.text.trim(),
+                      };
+
+                      Navigator.pop(dialogContext);
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (loaderContext) => const Center(child: CircularProgressIndicator()),
+                      );
+
+                      bool success;
+                      if (existingFood == null) {
+                        success = await foodCubit.createCustomFood(foodData);
+                      } else {
+                        success = await foodCubit.updateCustomFood(existingFood.foodId, foodData);
+                      }
+
+                      if (mounted) Navigator.pop(context); // Close loading
+
+                      if (success) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(existingFood == null ? "Đã tạo món ăn thành công!" : "Đã cập nhật món ăn thành công!"),
+                              backgroundColor: primaryGreen,
+                            ),
+                          );
+                        }
+                      } else {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Lỗi khi gửi thông tin món ăn tự tạo.")),
+                          );
+                        }
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(backgroundColor: primaryGreen),
+                    child: const Text("Lưu", style: TextStyle(color: Colors.white)),
+                  );
+                }
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Hủy", style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final name = nameController.text.trim();
-                final cal = double.tryParse(calController.text) ?? 0.0;
-                if (name.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Vui lòng nhập tên món ăn")));
-                  return;
-                }
-
-                final foodData = {
-                  "name": name,
-                  "description": descController.text.trim(),
-                  "calories": cal,
-                  "protein": double.tryParse(protController.text) ?? 0.0,
-                  "carbs": double.tryParse(carbController.text) ?? 0.0,
-                  "fat": double.tryParse(fatController.text) ?? 0.0,
-                  "servingSize": servingController.text.trim(),
-                  "barcode": barcodeController.text.trim(),
-                };
-
-                Navigator.pop(context);
-                showDialog(context: context, barrierDismissible: false, builder: (context) => const Center(child: CircularProgressIndicator()));
-
-                bool success;
-                if (existingFood == null) {
-                  success = await context.read<FoodCubit>().createCustomFood(foodData);
-                } else {
-                  success = await context.read<FoodCubit>().updateCustomFood(existingFood.foodId, foodData);
-                }
-
-                if (context.mounted) Navigator.pop(context); // Close loading
-
-                if (success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(existingFood == null ? "Đã tạo món ăn thành công!" : "Đã cập nhật món ăn thành công!"),
-                      backgroundColor: primaryGreen,
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Lỗi khi gửi thông tin món ăn tự tạo.")),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: primaryGreen),
-              child: const Text("Lưu", style: TextStyle(color: Colors.white)),
-            ),
-          ],
         );
       },
     );

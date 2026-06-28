@@ -31,13 +31,21 @@ class _MainNavigationContainerState extends State<MainNavigationContainer> {
   int _refreshCounter = 0;
   final _storage = const FlutterSecureStorage();
   String _userName = "User";
+  late final DashboardCubit _dashboardCubit;
 
   static const Color primaryGreen = Color(0xFF006D44);
 
   @override
   void initState() {
     super.initState();
+    _dashboardCubit = getIt<DashboardCubit>()..loadDashboardData();
     _loadUserInfo();
+  }
+
+  @override
+  void dispose() {
+    _dashboardCubit.close();
+    super.dispose();
   }
 
   Future<void> _loadUserInfo() async {
@@ -49,6 +57,19 @@ class _MainNavigationContainerState extends State<MainNavigationContainer> {
 
   void _navigateToTab(int index) {
     setState(() => _currentIndex = index);
+    if (index == 0) {
+      try {
+        _dashboardCubit.loadDashboardData(showLoading: false);
+      } catch (_) {}
+    } else if (index == 2) {
+      try {
+        MealTab.onReload?.call();
+      } catch (_) {}
+    } else if (index == 5) {
+      try {
+        AiCoachScreen.onReload?.call();
+      } catch (_) {}
+    }
   }
 
   // Maps raw bottom-nav tap index to actual tab index (AI Coach is center = index 2 visually, but maps to tab 5)
@@ -58,7 +79,23 @@ class _MainNavigationContainerState extends State<MainNavigationContainer> {
     // Remap: 0->0, 1->1, 2->5(AI), 3->2(Meals), 4->3(Water)
     const map = [0, 1, 5, 2, 3];
     if (navIndex < map.length) {
-      setState(() => _currentIndex = map[navIndex]);
+      final targetIndex = map[navIndex];
+      setState(() => _currentIndex = targetIndex);
+      
+      // Trigger background reload on navigation
+      if (targetIndex == 0) {
+        try {
+          _dashboardCubit.loadDashboardData(showLoading: false);
+        } catch (_) {}
+      } else if (targetIndex == 2) {
+        try {
+          MealTab.onReload?.call();
+        } catch (_) {}
+      } else if (targetIndex == 5) {
+        try {
+          AiCoachScreen.onReload?.call();
+        } catch (_) {}
+      }
     }
   }
 
@@ -70,15 +107,12 @@ class _MainNavigationContainerState extends State<MainNavigationContainer> {
   @override
   Widget build(BuildContext context) {
     final List<Widget> tabs = [
-      BlocProvider<DashboardCubit>(
-        create: (context) => getIt<DashboardCubit>(),
-        child: DashboardTab(
-          key: ValueKey("db_$_refreshCounter"),
-          onNavigateToMeals: () => _navigateToTab(2),
-          onNavigateToWater: () => _navigateToTab(3),
-          onNavigateToWeight: () => _navigateToTab(4),
-          onNavigateToAiCoach: () => _navigateToTab(5),
-        ),
+      DashboardTab(
+        key: ValueKey("db_$_refreshCounter"),
+        onNavigateToMeals: () => _navigateToTab(2),
+        onNavigateToWater: () => _navigateToTab(3),
+        onNavigateToWeight: () => _navigateToTab(4),
+        onNavigateToAiCoach: () => _navigateToTab(5),
       ),
       BlocProvider<FoodCubit>(
         create: (context) => getIt<FoodCubit>(),
@@ -99,7 +133,9 @@ class _MainNavigationContainerState extends State<MainNavigationContainer> {
       ),
     ];
 
-    return Scaffold(
+    return BlocProvider<DashboardCubit>.value(
+      value: _dashboardCubit,
+      child: Scaffold(
       appBar: AppBar(
         title: Row(
           children: [
@@ -163,7 +199,7 @@ class _MainNavigationContainerState extends State<MainNavigationContainer> {
         children: tabs,
       ),
       bottomNavigationBar: _buildBottomNav(),
-    );
+    ),);
   }
 
   Widget _buildBottomNav() {

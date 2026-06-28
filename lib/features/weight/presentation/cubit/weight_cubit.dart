@@ -1,5 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import '../../../../di/dependency_injection.dart';
+import '../../../dashboard/presentation/cubit/dashboard_cubit.dart';
 import '../../domain/repositories/weight_repository.dart';
 import 'weight_state.dart';
 
@@ -53,6 +55,9 @@ class WeightCubit extends Cubit<WeightState> {
             bodyFatHistory: bodyFatHistory,
             toastMessage: "Đã ghi nhận cân nặng thành công!",
           ));
+          try {
+            getIt<DashboardCubit>().loadDashboardData(showLoading: false);
+          } catch (_) {}
         } else {
           emit(currentState.copyWith(isOperationLoading: false, toastMessage: "Ghi nhận cân nặng thất bại."));
         }
@@ -83,6 +88,9 @@ class WeightCubit extends Cubit<WeightState> {
             bodyFatHistory: bodyFatHistory,
             toastMessage: "Đã cập nhật thành công!",
           ));
+          try {
+            getIt<DashboardCubit>().loadDashboardData(showLoading: false);
+          } catch (_) {}
         } else {
           emit(currentState.copyWith(isOperationLoading: false, toastMessage: "Cập nhật thất bại."));
         }
@@ -113,6 +121,9 @@ class WeightCubit extends Cubit<WeightState> {
             bodyFatHistory: bodyFatHistory,
             toastMessage: "Đã xóa cân nặng thành công!",
           ));
+          try {
+            getIt<DashboardCubit>().loadDashboardData(showLoading: false);
+          } catch (_) {}
         } else {
           emit(currentState.copyWith(isOperationLoading: false, toastMessage: "Xóa thất bại."));
         }

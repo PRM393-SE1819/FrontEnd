@@ -5,6 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../cubit/weight_cubit.dart';
 import '../cubit/weight_state.dart';
 import '../../domain/entities/weight_log.dart';
+import '../../../dashboard/presentation/cubit/dashboard_cubit.dart';
 
 class WeightTab extends StatefulWidget {
   const WeightTab({super.key});
@@ -247,6 +248,9 @@ class _WeightTabState extends State<WeightTab> {
     return BlocConsumer<WeightCubit, WeightState>(
       listener: (context, state) {
         if (state is WeightLoaded && state.toastMessage != null) {
+          try {
+            context.read<DashboardCubit>().loadDashboardData(showLoading: false);
+          } catch (_) {}
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.toastMessage!),
@@ -345,7 +349,7 @@ class _WeightTabState extends State<WeightTab> {
                 ),
                 if (state.isOperationLoading)
                   Container(
-                    color: Colors.black.withOpacity(0.2),
+                    color: Colors.black.withValues(alpha: 0.2),
                     child: const Center(child: CircularProgressIndicator()),
                   ),
               ],
@@ -382,7 +386,7 @@ class _WeightTabState extends State<WeightTab> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))
+              BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))
             ],
           ),
           child: Column(
@@ -431,7 +435,7 @@ class _WeightTabState extends State<WeightTab> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))
+              BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))
             ],
           ),
           child: Column(
@@ -493,7 +497,7 @@ class _WeightTabState extends State<WeightTab> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))
+          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))
         ],
       ),
       child: Column(
@@ -555,7 +559,7 @@ class _WeightTabState extends State<WeightTab> {
           ),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
-            BoxShadow(color: tealAccent.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 6))
+            BoxShadow(color: tealAccent.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 6))
           ],
         ),
         child: Row(
@@ -563,7 +567,7 @@ class _WeightTabState extends State<WeightTab> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(Icons.calculate_outlined, color: Colors.white, size: 28),
@@ -615,7 +619,7 @@ class _WeightTabState extends State<WeightTab> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: tealAccent.withOpacity(0.1),
+                    backgroundColor: tealAccent.withValues(alpha: 0.1),
                     child: Text('${bf.round()}%',
                         style: TextStyle(color: tealAccent, fontWeight: FontWeight.bold, fontSize: 12)),
                   ),
@@ -669,7 +673,7 @@ class _WeightTabState extends State<WeightTab> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: primaryGreen.withOpacity(0.1),
+                          backgroundColor: primaryGreen.withValues(alpha: 0.1),
                           child: Icon(Icons.monitor_weight_outlined, color: primaryGreen, size: 20),
                         ),
                         title: Text('${weight.toStringAsFixed(1)} kg',
@@ -682,7 +686,7 @@ class _WeightTabState extends State<WeightTab> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: tealAccent.withOpacity(0.1),
+                                  color: tealAccent.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text('${bodyFat.toStringAsFixed(1)}%',
@@ -717,7 +721,7 @@ class _WeightTabState extends State<WeightTab> {
                                     ],
                                   ),
                                 );
-                                if (confirm == true) {
+                                if (confirm == true && context.mounted) {
                                   context.read<WeightCubit>().deleteWeightLog(log.weightLogId);
                                 }
                               },
