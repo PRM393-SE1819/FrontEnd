@@ -8,6 +8,7 @@ import '../features/auth/domain/repositories/auth_repository.dart';
 import '../features/water/data/datasources/water_remote_data_source.dart';
 import '../features/water/data/repositories/water_repository_impl.dart';
 import '../features/water/domain/repositories/water_repository.dart';
+import '../features/water/presentation/cubit/water_cubit.dart';
 import '../features/weight/data/datasources/weight_remote_datasource.dart';
 import '../features/weight/data/repositories/weight_repository_impl.dart';
 import '../features/weight/domain/repositories/weight_repository.dart';
@@ -147,6 +148,10 @@ Future<void> setupDependencyInjection() async {
 
   getIt.registerFactory<WeightCubit>(() => WeightCubit(
         repository: getIt<WeightRepository>(),
+      ));
+
+  getIt.registerFactory<WaterCubit>(() => WaterCubit(
+        repository: getIt<WaterRepository>(),
       ));
 
   // Dashboard Feature

@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import '../../../../di/dependency_injection.dart';
 import '../../domain/entities/water_log.dart';
 import '../../domain/entities/water_reminder.dart';
-import '../../domain/repositories/water_repository.dart';
 import '../../../dashboard/presentation/cubit/dashboard_cubit.dart';
 import '../cubit/water_cubit.dart';
 import '../cubit/water_state.dart';
@@ -16,9 +15,7 @@ class WaterTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider<WaterCubit>(
-      create: (context) => WaterCubit(
-        repository: getIt<WaterRepository>(),
-      )..loadWaterData(DateTime.now()),
+      create: (context) => getIt<WaterCubit>()..loadWaterData(DateTime.now()),
       child: const WaterTabContent(),
     );
   }
