@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../../di/dependency_injection.dart';
 import '../../../../routes/main_navigation.dart';
-import '../../../../core/network/api_service.dart';
 import '../../domain/usecases/login_use_case.dart';
 import '../../domain/usecases/request_password_reset_use_case.dart';
 import '../../../profile/domain/usecases/update_health_profile_use_case.dart';

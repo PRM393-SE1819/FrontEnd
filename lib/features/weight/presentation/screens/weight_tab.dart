@@ -6,6 +6,9 @@ import '../cubit/weight_cubit.dart';
 import '../cubit/weight_state.dart';
 import '../../domain/entities/weight_log.dart';
 import '../../../dashboard/presentation/cubit/dashboard_cubit.dart';
+import '../../../../di/dependency_injection.dart';
+import '../../../profile/domain/repositories/profile_repository.dart';
+import '../../../profile/domain/entities/user_profile.dart';
 
 class WeightTab extends StatefulWidget {
   const WeightTab({super.key});
@@ -17,11 +20,34 @@ class WeightTab extends StatefulWidget {
 class _WeightTabState extends State<WeightTab> {
   final Color primaryGreen = const Color(0xFF006D44);
   final Color tealAccent = const Color(0xFF319795);
+  UserProfile? _userProfile;
 
   @override
   void initState() {
     super.initState();
     context.read<WeightCubit>().loadWeightData();
+    _loadUserProfile();
+  }
+
+  Future<void> _loadUserProfile() async {
+    if (!mounted) return;
+    try {
+      final profile = await getIt<ProfileRepository>().getHealthProfile();
+      if (mounted) {
+        setState(() {
+          _userProfile = profile;
+        });
+      }
+    } catch (_) {}
+  }
+
+  int _calculateAge(DateTime dob) {
+    final today = DateTime.now();
+    int age = today.year - dob.year;
+    if (today.month < dob.month || (today.month == dob.month && today.day < dob.day)) {
+      age--;
+    }
+    return age;
   }
 
   void _openLogWeightDialog({WeightLog? editLog, double? currentWeight, double? currentBodyFat}) {
@@ -29,7 +55,9 @@ class _WeightTabState extends State<WeightTab> {
       text: editLog?.weight.toString() ?? currentWeight?.toString() ?? '70',
     );
     final fatController = TextEditingController(
-      text: editLog?.bodyFat?.toString() ?? currentBodyFat?.toString() ?? '18',
+      text: editLog?.bodyFat != null
+          ? editLog!.bodyFat!.toStringAsFixed(1)
+          : (currentBodyFat != null ? currentBodyFat.toStringAsFixed(1) : '18'),
     );
 
     showDialog(
@@ -86,6 +114,7 @@ class _WeightTabState extends State<WeightTab> {
   }
 
   void _openBodyFatCalcDialog(double? currentWeight) {
+    final weightCubit = context.read<WeightCubit>();
     final waistCtrl = TextEditingController();
     final neckCtrl = TextEditingController();
     final hipCtrl = TextEditingController();
@@ -95,7 +124,7 @@ class _WeightTabState extends State<WeightTab> {
     showDialog(
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
-        builder: (context, setS) => AlertDialog(
+        builder: (builderCtx, setS) => AlertDialog(
           scrollable: true,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: const Text('Công cụ tính Tỷ lệ mỡ', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -153,9 +182,18 @@ class _WeightTabState extends State<WeightTab> {
                   TextButton(
                     onPressed: () {
                       Navigator.pop(dialogCtx);
-                      context.read<WeightCubit>().loadWeightData();
+                      weightCubit.loadWeightData();
                     },
-                    child: const Text('Hoàn thành'),
+                    child: const Text('Hoàn thành', style: TextStyle(color: Colors.grey)),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: primaryGreen),
+                    onPressed: () {
+                      Navigator.pop(dialogCtx);
+                      final bf = (result!['estimatedBodyFat'] as num?)?.toDouble();
+                      _openLogWeightDialog(currentWeight: currentWeight, currentBodyFat: bf);
+                    },
+                    child: const Text('Áp dụng vào Nhật ký', style: TextStyle(color: Colors.white)),
                   )
                 ]
               : [
@@ -171,19 +209,32 @@ class _WeightTabState extends State<WeightTab> {
                             final waist = double.tryParse(waistCtrl.text);
                             final neck = double.tryParse(neckCtrl.text);
                             if (waist == null || neck == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
+                              ScaffoldMessenger.of(builderCtx).showSnackBar(
                                 const SnackBar(content: Text('Vui lòng nhập vòng eo và vòng cổ')),
                               );
                               return;
                             }
-                            setS(() => isCalculating = true);
+
+                            final gender = _userProfile?.gender ?? 'Male';
+                            final isFemale = gender.toLowerCase() == 'female';
                             final hip = double.tryParse(hipCtrl.text);
-                            
-                            final res = await context.read<WeightCubit>().calculateBodyFat(
-                              gender: 'Male', // default
-                              age: 25,
-                              height: 170,
-                              weight: currentWeight ?? 70,
+                            if (isFemale && hip == null) {
+                              ScaffoldMessenger.of(builderCtx).showSnackBar(
+                                const SnackBar(content: Text('Vui lòng nhập số đo vòng hông cho Nữ')),
+                              );
+                              return;
+                            }
+
+                            setS(() => isCalculating = true);
+                            final age = _userProfile != null ? _calculateAge(_userProfile!.dateOfBirth) : 25;
+                            final height = _userProfile?.height ?? 170.0;
+                            final weight = currentWeight ?? _userProfile?.weight ?? 70.0;
+
+                            final res = await weightCubit.calculateBodyFat(
+                              gender: gender,
+                              age: age,
+                              height: height,
+                              weight: weight,
                               waist: waist,
                               neck: neck,
                               hip: hip,
@@ -406,10 +457,13 @@ class _WeightTabState extends State<WeightTab> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    "Thay đổi cân nặng:",
-                    style: TextStyle(color: Colors.grey[700], fontSize: 14),
+                  Expanded(
+                    child: Text(
+                      "Thay đổi cân nặng:",
+                      style: TextStyle(color: Colors.grey[700], fontSize: 14),
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   Text(
                     weightChanged != null
                         ? "${weightChanged > 0 ? '+' : ''}${weightChanged.toStringAsFixed(1)} kg"
@@ -454,10 +508,13 @@ class _WeightTabState extends State<WeightTab> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    "Thay đổi mỡ cơ thể:",
-                    style: TextStyle(color: Colors.grey[700], fontSize: 14),
+                  Expanded(
+                    child: Text(
+                      "Thay đổi mỡ cơ thể:",
+                      style: TextStyle(color: Colors.grey[700], fontSize: 14),
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   Text(
                     bodyFatChanged != null
                         ? "${bodyFatChanged > 0 ? '+' : ''}${bodyFatChanged.toStringAsFixed(1)}%"
@@ -711,6 +768,8 @@ class _WeightTabState extends State<WeightTab> {
                                             color: tealAccent, fontWeight: FontWeight.bold, fontSize: 12)),
                                   ),
                                 IconButton(
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
                                   icon: const Icon(Icons.edit_outlined, color: Colors.grey, size: 20),
                                   onPressed: () => _openLogWeightDialog(
                                     editLog: log,
@@ -718,7 +777,10 @@ class _WeightTabState extends State<WeightTab> {
                                     currentBodyFat: currentBodyFat,
                                   ),
                                 ),
+                                const SizedBox(width: 12),
                                 IconButton(
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
                                   icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
                                   onPressed: () async {
                                     final confirm = await showDialog<bool>(

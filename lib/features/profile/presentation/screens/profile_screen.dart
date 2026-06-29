@@ -88,9 +88,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   DropdownButtonFormField<String>(
+                    isExpanded: true,
                     value: editGender,
                     decoration: const InputDecoration(labelText: "Giới tính"),
-                    items: genderOptions.map((g) => DropdownMenuItem(value: g, child: Text(genderLabelMap[g] ?? g))).toList(),
+                    items: genderOptions.map((g) => DropdownMenuItem(value: g, child: Text(genderLabelMap[g] ?? g, overflow: TextOverflow.ellipsis))).toList(),
                     onChanged: (val) => setDialogState(() => editGender = val!),
                   ),
                   const SizedBox(height: 12),
@@ -114,16 +115,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
+                    isExpanded: true,
                     value: editActivity,
                     decoration: const InputDecoration(labelText: "Mức độ hoạt động"),
-                    items: activityOptions.map((a) => DropdownMenuItem(value: a, child: Text(activityLabelMap[a] ?? a))).toList(),
+                    items: activityOptions.map((a) => DropdownMenuItem(value: a, child: Text(activityLabelMap[a] ?? a, overflow: TextOverflow.ellipsis))).toList(),
                     onChanged: (val) => setDialogState(() => editActivity = val!),
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
+                    isExpanded: true,
                     value: editGoal,
                     decoration: const InputDecoration(labelText: "Mục tiêu"),
-                    items: goalOptions.map((g) => DropdownMenuItem(value: g, child: Text(goalLabelMap[g] ?? g))).toList(),
+                    items: goalOptions.map((g) => DropdownMenuItem(value: g, child: Text(goalLabelMap[g] ?? g, overflow: TextOverflow.ellipsis))).toList(),
                     onChanged: (val) => setDialogState(() => editGoal = val!),
                   ),
                   const SizedBox(height: 12),
