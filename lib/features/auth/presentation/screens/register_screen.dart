@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../../di/dependency_injection.dart';
-import '../../domain/repositories/auth_repository.dart';
+import '../../domain/usecases/register_use_case.dart';
 import 'login_screen.dart';
 import 'verify_email_screen.dart';
 
@@ -145,11 +145,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      final responseData = await getIt<AuthRepository>().register(
-        fullName,
-        username,
-        email,
-        password,
+      final responseData = await getIt<RegisterUseCase>().call(
+        RegisterParams(
+          fullName: fullName,
+          username: username,
+          email: email,
+          password: password,
+        ),
       );
 
       setState(() {

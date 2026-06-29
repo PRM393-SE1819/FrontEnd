@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../di/dependency_injection.dart';
-import '../../domain/repositories/auth_repository.dart';
+import '../../domain/usecases/reset_password_use_case.dart';
 import 'login_screen.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
@@ -62,7 +62,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     });
 
     try {
-      final responseData = await getIt<AuthRepository>().resetPassword(token, newPassword);
+      final responseData = await getIt<ResetPasswordUseCase>().call(
+        ResetPasswordParams(token: token, newPassword: newPassword),
+      );
 
       setState(() {
         _isLoading = false;

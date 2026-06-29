@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../di/dependency_injection.dart';
-import '../../domain/repositories/auth_repository.dart';
+import '../../domain/usecases/verify_email_use_case.dart';
+import '../../domain/usecases/resend_verification_email_use_case.dart';
 import 'login_screen.dart';
 
 class VerifyEmailScreen extends StatefulWidget {
@@ -46,7 +47,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     });
 
     try {
-      final responseData = await getIt<AuthRepository>().verifyEmail(widget.email, token);
+      final responseData = await getIt<VerifyEmailUseCase>().call(
+        VerifyEmailParams(email: widget.email, token: token),
+      );
 
       setState(() {
         _isLoading = false;
@@ -83,7 +86,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     });
 
     try {
-      final responseData = await getIt<AuthRepository>().verifyEmail(widget.email, code);
+      final responseData = await getIt<VerifyEmailUseCase>().call(
+        VerifyEmailParams(email: widget.email, token: code),
+      );
 
       setState(() {
         _isLoading = false;
@@ -114,7 +119,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     });
 
     try {
-      final responseData = await getIt<AuthRepository>().resendVerificationEmail(widget.email);
+      final responseData = await getIt<ResendVerificationEmailUseCase>().call(widget.email);
 
       setState(() {
         _isResending = false;

@@ -49,6 +49,33 @@ import '../features/food/data/repositories/food_repository_impl.dart';
 import '../features/food/domain/repositories/food_repository.dart';
 import '../features/food/presentation/cubit/food_cubit.dart';
 
+// UseCases
+import '../features/auth/domain/usecases/login_use_case.dart';
+import '../features/auth/domain/usecases/register_use_case.dart';
+import '../features/auth/domain/usecases/verify_email_use_case.dart';
+import '../features/auth/domain/usecases/resend_verification_email_use_case.dart';
+import '../features/auth/domain/usecases/request_password_reset_use_case.dart';
+import '../features/auth/domain/usecases/reset_password_use_case.dart';
+import '../features/meal/domain/usecases/add_meal_use_case.dart';
+import '../features/profile/domain/usecases/update_health_profile_use_case.dart';
+import '../features/profile/domain/usecases/add_health_condition_use_case.dart';
+import '../features/profile/domain/usecases/add_allergy_use_case.dart';
+import '../features/food/domain/usecases/search_foods_use_case.dart';
+import '../features/food/domain/usecases/create_custom_food_use_case.dart';
+import '../features/ai_coach/domain/usecases/estimate_calories_use_case.dart';
+import '../features/ai_coach/domain/usecases/delete_all_chat_history_use_case.dart';
+import '../features/ai_coach/domain/usecases/ai_coach_search_foods_use_case.dart';
+import '../features/admin/domain/usecases/get_users_use_case.dart';
+import '../features/admin/domain/usecases/set_user_status_use_case.dart';
+import '../features/admin/domain/usecases/change_user_role_use_case.dart';
+import '../features/admin/domain/usecases/delete_user_use_case.dart';
+import '../features/admin/domain/usecases/get_alerts_use_case.dart';
+import '../features/admin/domain/usecases/dismiss_alert_use_case.dart';
+import '../features/admin/domain/usecases/get_queue_use_case.dart';
+import '../features/admin/domain/usecases/get_resolved_use_case.dart';
+import '../features/admin/domain/usecases/update_moderation_status_use_case.dart';
+import '../features/admin/domain/usecases/get_analytics_overview_use_case.dart';
+
 
 final getIt = GetIt.instance;
 
@@ -161,6 +188,7 @@ void setupDependencyInjection() {
       ));
   getIt.registerLazySingleton<DashboardRepository>(() => DashboardRepositoryImpl(
         remoteDataSource: getIt<DashboardRemoteDataSource>(),
+        waterRepository: getIt<WaterRepository>(),
       ));
   getIt.registerLazySingleton<DashboardCubit>(() => DashboardCubit(
         repository: getIt<DashboardRepository>(),
@@ -177,4 +205,42 @@ void setupDependencyInjection() {
   getIt.registerFactory<FoodCubit>(() => FoodCubit(
         repository: getIt<FoodRepository>(),
       ));
+
+  // Register UseCases
+  // Auth
+  getIt.registerLazySingleton<LoginUseCase>(() => LoginUseCase(getIt<AuthRepository>()));
+  getIt.registerLazySingleton<RegisterUseCase>(() => RegisterUseCase(getIt<AuthRepository>()));
+  getIt.registerLazySingleton<VerifyEmailUseCase>(() => VerifyEmailUseCase(getIt<AuthRepository>()));
+  getIt.registerLazySingleton<ResendVerificationEmailUseCase>(() => ResendVerificationEmailUseCase(getIt<AuthRepository>()));
+  getIt.registerLazySingleton<RequestPasswordResetUseCase>(() => RequestPasswordResetUseCase(getIt<AuthRepository>()));
+  getIt.registerLazySingleton<ResetPasswordUseCase>(() => ResetPasswordUseCase(getIt<AuthRepository>()));
+
+  // Meal
+  getIt.registerLazySingleton<AddMealUseCase>(() => AddMealUseCase(getIt<MealRepository>()));
+
+  // Profile
+  getIt.registerLazySingleton<UpdateHealthProfileUseCase>(() => UpdateHealthProfileUseCase(getIt<ProfileRepository>()));
+  getIt.registerLazySingleton<AddHealthConditionUseCase>(() => AddHealthConditionUseCase(getIt<ProfileRepository>()));
+  getIt.registerLazySingleton<AddAllergyUseCase>(() => AddAllergyUseCase(getIt<ProfileRepository>()));
+
+  // Food
+  getIt.registerLazySingleton<SearchFoodsUseCase>(() => SearchFoodsUseCase(getIt<FoodRepository>()));
+  getIt.registerLazySingleton<CreateCustomFoodUseCase>(() => CreateCustomFoodUseCase(getIt<FoodRepository>()));
+
+  // AI Coach
+  getIt.registerLazySingleton<EstimateCaloriesUseCase>(() => EstimateCaloriesUseCase(getIt<AiCoachRepository>()));
+  getIt.registerLazySingleton<DeleteAllChatHistoryUseCase>(() => DeleteAllChatHistoryUseCase(getIt<AiCoachRepository>()));
+  getIt.registerLazySingleton<AiCoachSearchFoodsUseCase>(() => AiCoachSearchFoodsUseCase(getIt<AiCoachRepository>()));
+
+  // Admin
+  getIt.registerLazySingleton<GetUsersUseCase>(() => GetUsersUseCase(getIt<UserRegistryRepository>()));
+  getIt.registerLazySingleton<SetUserStatusUseCase>(() => SetUserStatusUseCase(getIt<UserRegistryRepository>()));
+  getIt.registerLazySingleton<ChangeUserRoleUseCase>(() => ChangeUserRoleUseCase(getIt<UserRegistryRepository>()));
+  getIt.registerLazySingleton<DeleteUserUseCase>(() => DeleteUserUseCase(getIt<UserRegistryRepository>()));
+  getIt.registerLazySingleton<GetAlertsUseCase>(() => GetAlertsUseCase(getIt<AlertsRepository>()));
+  getIt.registerLazySingleton<DismissAlertUseCase>(() => DismissAlertUseCase(getIt<AlertsRepository>()));
+  getIt.registerLazySingleton<GetQueueUseCase>(() => GetQueueUseCase(getIt<ModerationRepository>()));
+  getIt.registerLazySingleton<GetResolvedUseCase>(() => GetResolvedUseCase(getIt<ModerationRepository>()));
+  getIt.registerLazySingleton<UpdateModerationStatusUseCase>(() => UpdateModerationStatusUseCase(getIt<ModerationRepository>()));
+  getIt.registerLazySingleton<GetAnalyticsOverviewUseCase>(() => GetAnalyticsOverviewUseCase(getIt<AnalyticsRepository>()));
 }

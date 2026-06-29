@@ -21,4 +21,6 @@ abstract class AiCoachRepository {
 
   Future<Map<String, dynamic>?> searchFoods(String query);
   Future<Map<String, dynamic>?> addMeal(Map<String, dynamic> mealData);
+  Future<Map<String, dynamic>?> estimateCalories(String foodDescription);
+  Future<bool> deleteAllChatHistory();
 }

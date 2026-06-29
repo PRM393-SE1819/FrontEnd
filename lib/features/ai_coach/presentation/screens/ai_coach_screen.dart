@@ -8,7 +8,12 @@ import '../../../meal/presentation/screens/meal_tab.dart';
 import '../../domain/entities/chat_message.dart';
 import '../cubit/ai_coach_cubit.dart';
 import '../cubit/ai_coach_state.dart';
-import '../../../../core/network/api_service.dart';
+import '../../../../di/dependency_injection.dart';
+import '../../domain/usecases/ai_coach_search_foods_use_case.dart';
+import '../../domain/usecases/estimate_calories_use_case.dart';
+import '../../domain/usecases/delete_all_chat_history_use_case.dart';
+import '../../../../core/usecases/usecase.dart';
+import '../../../food/domain/usecases/create_custom_food_use_case.dart';
 
 class AiCoachScreen extends StatefulWidget {
   const AiCoachScreen({super.key});
@@ -178,7 +183,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
           builder: (context, setDialogState) {
             Future<void> performSearch() async {
               setDialogState(() => searching = true);
-              final res = await ApiService.searchFoods(searchController.text.trim());
+              final res = await getIt<AiCoachSearchFoodsUseCase>().call(searchController.text.trim());
               setDialogState(() {
                 results = res != null ? res['items'] ?? [] : [];
                 searching = false;
@@ -867,7 +872,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
         final quantity = weight * multiplier;
 
         // 1. Search food
-        final searchResult = await ApiService.searchFoods(foodName);
+        final searchResult = await getIt<AiCoachSearchFoodsUseCase>().call(foodName);
         int? foodId;
         String? servingSize;
 
@@ -891,7 +896,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
           
           servingSize = weight > 0 ? "${weight.round()}g" : (item['portion_size'] ?? "100g");
 
-          final customFood = await ApiService.createCustomFood({
+          final customFood = await getIt<CreateCustomFoodUseCase>().call({
             "name": foodName,
             "description": "Nhận diện từ AI Scan",
             "calories": calories,
@@ -902,7 +907,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
           });
 
           if (customFood != null) {
-            foodId = customFood['foodId'];
+            foodId = customFood.foodId;
           }
         }
 
@@ -958,7 +963,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
     );
     overlayState.insert(overlayEntry);
 
-    final res = await ApiService.estimateCalories(description.trim());
+    final res = await getIt<EstimateCaloriesUseCase>().call(description.trim());
     overlayEntry.remove();
 
     if (res != null) {
@@ -1144,7 +1149,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                         ),
                       );
                       if (confirm == true) {
-                        await ApiService.deleteAllChatHistory();
+                        await getIt<DeleteAllChatHistoryUseCase>().call(NoParams());
                         if (mounted) {
                           context.read<AiCoachCubit>().loadInitialData();
                         }

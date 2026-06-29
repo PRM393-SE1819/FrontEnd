@@ -2,12 +2,15 @@ import '../../domain/entities/dashboard_summary.dart';
 import '../../domain/repositories/dashboard_repository.dart';
 import '../datasources/dashboard_remote_datasource.dart';
 import '../../../water/domain/repositories/water_repository.dart';
-import '../../../../di/dependency_injection.dart';
 
 class DashboardRepositoryImpl implements DashboardRepository {
   final DashboardRemoteDataSource remoteDataSource;
+  final WaterRepository waterRepository;
 
-  const DashboardRepositoryImpl({required this.remoteDataSource});
+  const DashboardRepositoryImpl({
+    required this.remoteDataSource,
+    required this.waterRepository,
+  });
 
   @override
   Future<DashboardSummary?> getDashboardSummary(String dateStr) async {
@@ -44,7 +47,7 @@ class DashboardRepositoryImpl implements DashboardRepository {
       double waterConsumed = 0.0;
       double waterGoal = 2000.0;
       try {
-        final waterSummary = await getIt<WaterRepository>().getDailyWaterSummary(dateStr);
+        final waterSummary = await waterRepository.getDailyWaterSummary(dateStr);
         waterConsumed = waterSummary.consumedML;
         waterGoal = waterSummary.goalML;
       } catch (_) {

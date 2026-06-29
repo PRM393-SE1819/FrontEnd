@@ -76,4 +76,14 @@ class AiCoachRepositoryImpl implements AiCoachRepository {
   Future<Map<String, dynamic>?> addMeal(Map<String, dynamic> mealData) async {
     return await remoteDataSource.addMeal(mealData);
   }
+
+  @override
+  Future<Map<String, dynamic>?> estimateCalories(String foodDescription) async {
+    return await remoteDataSource.estimateCalories(foodDescription);
+  }
+
+  @override
+  Future<bool> deleteAllChatHistory() async {
+    return await remoteDataSource.deleteAllChatHistory();
+  }
 }

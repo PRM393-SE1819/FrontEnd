@@ -4,7 +4,11 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../../di/dependency_injection.dart';
 import '../../../../routes/main_navigation.dart';
 import '../../../../core/network/api_service.dart';
-import '../../domain/repositories/auth_repository.dart';
+import '../../domain/usecases/login_use_case.dart';
+import '../../domain/usecases/request_password_reset_use_case.dart';
+import '../../../profile/domain/usecases/update_health_profile_use_case.dart';
+import '../../../profile/domain/usecases/add_health_condition_use_case.dart';
+import '../../../profile/domain/usecases/add_allergy_use_case.dart';
 import 'register_screen.dart';
 import 'reset_password_screen.dart';
 
@@ -85,7 +89,7 @@ class _LoginScreenState extends State<LoginScreen> {
     // Đăng nhập qua API thật. Token JWT chứa role -> dùng để định tuyến
     // Admin vào trang quản trị, người dùng thường vào app chính.
     try {
-      final data = await getIt<AuthRepository>().login(email, password);
+      final data = await getIt<LoginUseCase>().call(LoginParams(email: email, password: password));
 
       if (!mounted) return;
       Navigator.pop(context);
@@ -199,7 +203,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     });
 
                     try {
-                      final responseData = await getIt<AuthRepository>().requestPasswordReset(email);
+                      final responseData = await getIt<RequestPasswordResetUseCase>().call(email);
 
                       if (responseData != null) {
                         if (context.mounted) {
@@ -498,7 +502,7 @@ class _LoginScreenState extends State<LoginScreen> {
       // 1. Sync Health Profile
       final profile = data['profile'];
       if (profile != null) {
-        await ApiService.updateHealthProfile(profile);
+        await getIt<UpdateHealthProfileUseCase>().call(profile);
       }
 
       // 2. Sync Conditions
@@ -507,7 +511,9 @@ class _LoginScreenState extends State<LoginScreen> {
         for (var cond in conditions) {
           final name = cond['conditionName'];
           final notes = cond['notes'] ?? '';
-          await ApiService.addHealthCondition(name, notes);
+          await getIt<AddHealthConditionUseCase>().call(
+            AddHealthConditionParams(conditionName: name, notes: notes),
+          );
         }
       }
 
@@ -516,7 +522,9 @@ class _LoginScreenState extends State<LoginScreen> {
       if (allergies != null) {
         for (var allergy in allergies) {
           final name = allergy['allergyName'];
-          await ApiService.addAllergy(name, '');
+          await getIt<AddAllergyUseCase>().call(
+            AddAllergyParams(allergyName: name, notes: ''),
+          );
         }
       }
 

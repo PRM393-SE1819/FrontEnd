@@ -3,7 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../di/dependency_injection.dart';
 import '../../../dashboard/presentation/cubit/dashboard_cubit.dart';
 import '../../../meal/domain/entities/food.dart';
-import '../../../meal/domain/repositories/meal_repository.dart';
+import '../../../meal/domain/usecases/add_meal_use_case.dart';
 import '../cubit/food_cubit.dart';
 import '../cubit/food_state.dart';
 import '../../../meal/presentation/screens/meal_tab.dart';
@@ -337,7 +337,7 @@ class _FoodTabState extends State<FoodTab> with SingleTickerProviderStateMixin {
                       builder: (loaderContext) => const Center(child: CircularProgressIndicator()),
                     );
 
-                    final res = await getIt<MealRepository>().addMeal(mealData);
+                    final res = await getIt<AddMealUseCase>().call(mealData);
                     if (mounted) {
                       Navigator.pop(context); // Close loading
                     }

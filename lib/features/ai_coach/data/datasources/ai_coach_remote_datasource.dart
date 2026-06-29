@@ -360,4 +360,26 @@ $userMessage
     }
     return null;
   }
+
+  Future<Map<String, dynamic>?> estimateCalories(String foodDescription) async {
+    final headers = await _getHeaders(hasBody: true);
+    final response = await client.post(
+      Uri.parse("${ApiConfig.baseUrl}/ai/calorie-estimate"),
+      headers: headers,
+      body: jsonEncode({"foodDescription": foodDescription}),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    return null;
+  }
+
+  Future<bool> deleteAllChatHistory() async {
+    final headers = await _getHeaders();
+    final response = await client.delete(
+      Uri.parse("${ApiConfig.baseUrl}/ai/chat/history"),
+      headers: headers,
+    );
+    return response.statusCode == 200;
+  }
 }
