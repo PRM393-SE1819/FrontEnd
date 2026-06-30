@@ -138,18 +138,18 @@ class _UserRegistryScreenState extends State<UserRegistryScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Delete user"),
+        title: const Text("Xóa người dùng"),
         content: Text(
-            "Are you sure you want to permanently delete ${user.name}?"),
+            "Bạn có chắc muốn xóa vĩnh viễn ${user.name}?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text("Cancel"),
+            child: const Text("Hủy"),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: TextButton.styleFrom(foregroundColor: const Color(0xFFE53E3E)),
-            child: const Text("Delete"),
+            child: const Text("Xóa"),
           ),
         ],
       ),
@@ -160,7 +160,7 @@ class _UserRegistryScreenState extends State<UserRegistryScreen> {
     if ((_result?.items.length ?? 0) <= 1 && _page > 1) _page--;
     await _loadData();
     if (!mounted) return;
-    _snack("Deleted ${user.name}");
+    _snack("Đã xóa ${user.name}");
   }
 
   Future<void> _openFilterSheet() async {
@@ -191,7 +191,7 @@ class _UserRegistryScreenState extends State<UserRegistryScreen> {
       floatingActionButton: FloatingActionButton(
         backgroundColor: _primaryGreen,
         onPressed: () => _snack(
-            "Backend has no admin create-user API — users self-register"),
+            "Backend không có API tạo người dùng cho admin — người dùng tự đăng ký"),
         child: const Icon(Icons.person_add_alt_1, color: Colors.white),
       ),
       body: Column(
@@ -213,7 +213,7 @@ class _UserRegistryScreenState extends State<UserRegistryScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            "User Registry",
+            "Quản lý người dùng",
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.w800,
@@ -222,7 +222,7 @@ class _UserRegistryScreenState extends State<UserRegistryScreen> {
           ),
           SizedBox(height: 4),
           Text(
-            "Manage application access, monitor status, and enforce roles.",
+            "Quản lý quyền truy cập, theo dõi trạng thái và phân vai trò.",
             style: TextStyle(fontSize: 13, color: Color(0xFFDD6B20)),
           ),
         ],
@@ -239,7 +239,7 @@ class _UserRegistryScreenState extends State<UserRegistryScreen> {
             controller: _searchController,
             onChanged: _onSearchChanged,
             decoration: InputDecoration(
-              hintText: "Search by name or email...",
+              hintText: "Tìm theo tên hoặc email...",
               hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
               prefixIcon: Icon(Icons.search, color: Colors.grey[500], size: 20),
               filled: true,
@@ -270,7 +270,7 @@ class _UserRegistryScreenState extends State<UserRegistryScreen> {
                 color: _hasFilter ? _primaryGreen : _textDark,
               ),
               label: Text(
-                _hasFilter ? "Filter List • On" : "Filter List",
+                _hasFilter ? "Bộ lọc • Bật" : "Bộ lọc",
                 style: TextStyle(
                   color: _hasFilter ? _primaryGreen : _textDark,
                   fontWeight: FontWeight.bold,
@@ -305,7 +305,7 @@ class _UserRegistryScreenState extends State<UserRegistryScreen> {
             Icon(Icons.person_search, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 12),
             Text(
-              "No users found",
+              "Không tìm thấy người dùng",
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
@@ -346,7 +346,7 @@ class _UserRegistryScreenState extends State<UserRegistryScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            "Showing ${result.from} to ${result.to} of ${result.total} entries",
+            "Hiển thị ${result.from}–${result.to} trên ${result.total} mục",
             style: TextStyle(fontSize: 12, color: Colors.grey[600]),
           ),
           Row(
@@ -458,7 +458,7 @@ class _ManageUserSheetState extends State<_ManageUserSheet> {
           ),
           const SizedBox(height: 20),
           const Text(
-            "Role",
+            "Vai trò",
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
@@ -519,7 +519,7 @@ class _ManageUserSheetState extends State<_ManageUserSheet> {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: const Text("Save changes",
+              child: const Text("Lưu thay đổi",
                   style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ),
@@ -530,7 +530,7 @@ class _ManageUserSheetState extends State<_ManageUserSheet> {
               onPressed: () =>
                   Navigator.pop(context, const _ManageResult(deleted: true)),
               icon: const Icon(Icons.delete_outline, size: 18),
-              label: const Text("Delete user",
+              label: const Text("Xóa người dùng",
                   style: TextStyle(fontWeight: FontWeight.bold)),
               style: TextButton.styleFrom(
                 foregroundColor: const Color(0xFFE53E3E),
@@ -590,7 +590,7 @@ class _FilterSheetState extends State<_FilterSheet> {
           ),
           const SizedBox(height: 16),
           const Text(
-            "Filter users",
+            "Lọc người dùng",
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -598,29 +598,29 @@ class _FilterSheetState extends State<_FilterSheet> {
             ),
           ),
           const SizedBox(height: 16),
-          const Text("Status",
+          const Text("Trạng thái",
               style: TextStyle(fontWeight: FontWeight.bold, color: _textDark)),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             children: [
-              _chip("All", _status == null, () => setState(() => _status = null)),
-              _chip("Active", _status == UserStatus.active,
+              _chip("Tất cả", _status == null, () => setState(() => _status = null)),
+              _chip("Hoạt động", _status == UserStatus.active,
                   () => setState(() => _status = UserStatus.active)),
-              _chip("Banned", _status == UserStatus.suspended,
+              _chip("Đã khóa", _status == UserStatus.suspended,
                   () => setState(() => _status = UserStatus.suspended)),
             ],
           ),
           const SizedBox(height: 16),
-          const Text("Role",
+          const Text("Vai trò",
               style: TextStyle(fontWeight: FontWeight.bold, color: _textDark)),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             children: [
-              _chip("All", _roleId == null, () => setState(() => _roleId = null)),
-              _chip("Admin", _roleId == 1, () => setState(() => _roleId = 1)),
-              _chip("User", _roleId == 2, () => setState(() => _roleId = 2)),
+              _chip("Tất cả", _roleId == null, () => setState(() => _roleId = null)),
+              _chip("Quản trị", _roleId == 1, () => setState(() => _roleId = 1)),
+              _chip("Người dùng", _roleId == 2, () => setState(() => _roleId = 2)),
             ],
           ),
           const SizedBox(height: 24),
@@ -636,7 +636,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text("Clear",
+                  child: const Text("Xóa lọc",
                       style: TextStyle(
                           color: _textDark, fontWeight: FontWeight.bold)),
                 ),
@@ -654,7 +654,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text("Apply",
+                  child: const Text("Áp dụng",
                       style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),

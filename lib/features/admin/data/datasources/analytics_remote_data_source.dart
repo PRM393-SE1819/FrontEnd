@@ -1,21 +1,36 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
-import '../../../../core/network/api_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
+import '../../../../core/network/api_config.dart';
 import '../models/analytics_overview.dart';
-import 'analytics_mock_data_source.dart';
 
-/// Nguồn dữ liệu THẬT cho Analytics — gọi `GET /api/admin/dashboard`
+/// Nguồn dữ liệu cho Analytics — gọi `GET /api/admin/dashboard`
 /// (trả về `DashboardDto`) rồi map sang [AnalyticsOverview] mà UI đang dùng.
 ///
-/// LƯU Ý: Backend KHÔNG cung cấp "System Health" và "Security Log".
-/// Hai phần đó hiển thị giá trị tĩnh hợp lý (đánh dấu rõ bên dưới) cho tới khi
-/// có API tương ứng.
-class AnalyticsRemoteDataSource implements AnalyticsDataSource {
-  const AnalyticsRemoteDataSource();
+/// Tự gọi HTTP qua [http.Client] inject vào (dễ test/mock), tự đính kèm
+/// Bearer token đọc từ [FlutterSecureStorage].
+class AnalyticsRemoteDataSource {
+  final http.Client client;
+  final FlutterSecureStorage storage;
 
-  @override
+  const AnalyticsRemoteDataSource({
+    required this.client,
+    required this.storage,
+  });
+
+  Future<Map<String, String>> _getHeaders() async {
+    final token = await storage.read(key: 'jwt_token');
+    return {
+      if (token != null) "Authorization": "Bearer $token",
+    };
+  }
+
   Future<AnalyticsOverview> fetchOverview() async {
-    final response = await ApiService.get("/admin/dashboard");
+    final headers = await _getHeaders();
+    final response = await client.get(
+      Uri.parse("${ApiConfig.baseUrl}/admin/dashboard"),
+      headers: headers,
+    );
     if (response.statusCode != 200) {
       throw Exception("Failed to load dashboard (${response.statusCode})");
     }
@@ -33,19 +48,19 @@ class AnalyticsRemoteDataSource implements AnalyticsDataSource {
     return AnalyticsOverview(
       metrics: [
         MetricStat(
-          label: "Total Users",
+          label: "Tổng người dùng",
           value: _compact(totalUsers),
           changePercent: _pct(newThisWeek, totalUsers),
           isUp: true,
         ),
         MetricStat(
-          label: "Active Users",
+          label: "Đang hoạt động",
           value: _compact((summary['activeUsers'] as num?)?.toInt() ?? 0),
           changePercent: _pct(newToday, totalUsers),
           isUp: true,
         ),
         MetricStat(
-          label: "AI Requests",
+          label: "Yêu cầu AI",
           value: _compact((summary['totalAIRequests'] as num?)?.toInt() ?? 0),
           // Backend không có xu hướng cho chỉ số này -> ẩn pill.
           changePercent: null,
@@ -58,25 +73,6 @@ class AnalyticsRemoteDataSource implements AnalyticsDataSource {
                 0,
         aiChatAnomalies: (summary['bannedUsers'] as num?)?.toInt() ?? 0,
       ),
-      // ----- Phần backend chưa hỗ trợ: giữ tĩnh -----
-      health: const [
-        HealthIndicator(
-          name: "API Gateway",
-          icon: Icons.dns,
-          status: HealthStatus.operational,
-        ),
-        HealthIndicator(
-          name: "Core Database",
-          icon: Icons.storage,
-          status: HealthStatus.operational,
-        ),
-        HealthIndicator(
-          name: "AI Engine",
-          icon: Icons.psychology_alt,
-          status: HealthStatus.operational,
-        ),
-      ],
-      logs: const [], // chưa có API security log
     );
   }
 

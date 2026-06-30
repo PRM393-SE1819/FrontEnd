@@ -2,7 +2,7 @@ import '../../data/models/admin_user.dart';
 
 /// Hợp đồng (interface) cho dữ liệu User Registry.
 ///
-/// Hiện được hiện thực bằng remote (API thật) hoặc mock — chọn ở DI.
+/// Được hiện thực bởi [UserRegistryRepositoryImpl] (gọi API thật).
 abstract class UserRegistryRepository {
   /// Lấy 1 trang user, hỗ trợ tìm kiếm + lọc theo trạng thái/vai trò.
   Future<PaginatedUsers> getUsers({

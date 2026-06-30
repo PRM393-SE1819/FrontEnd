@@ -160,7 +160,7 @@ class ModerationCard extends StatelessWidget {
       children: [
         Expanded(
           child: _actionButton(
-            label: "Approve",
+            label: "Duyệt",
             background: _primaryGreen,
             foreground: Colors.white,
             onTap: () => onAction?.call(ModerationStatus.approved),
@@ -169,7 +169,7 @@ class ModerationCard extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: _actionButton(
-            label: "Reject",
+            label: "Từ chối",
             background: const Color(0xFFFDECEC),
             foreground: const Color(0xFFE53E3E),
             onTap: () => onAction?.call(ModerationStatus.rejected),
@@ -178,7 +178,7 @@ class ModerationCard extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: _actionButton(
-            label: "Escalate",
+            label: "Chuyển cấp",
             background: const Color(0xFFE7F0FE),
             foreground: const Color(0xFF2B6CB0),
             onTap: () => onAction?.call(ModerationStatus.escalated),
@@ -223,22 +223,22 @@ class ModerationCard extends StatelessWidget {
     switch (item.status) {
       case ModerationStatus.approved:
         color = _primaryGreen;
-        text = "Approved";
+        text = "Đã duyệt";
         icon = Icons.check_circle;
         break;
       case ModerationStatus.rejected:
         color = const Color(0xFFE53E3E);
-        text = "Rejected";
+        text = "Đã từ chối";
         icon = Icons.cancel;
         break;
       case ModerationStatus.escalated:
         color = const Color(0xFF2B6CB0);
-        text = "Escalated";
+        text = "Đã chuyển cấp";
         icon = Icons.arrow_upward;
         break;
       case ModerationStatus.pending:
         color = Colors.grey;
-        text = "Pending";
+        text = "Đang chờ";
         icon = Icons.hourglass_empty;
         break;
     }
@@ -260,9 +260,9 @@ class ModerationCard extends StatelessWidget {
 
   String _timeAgo(DateTime time) {
     final diff = DateTime.now().difference(time);
-    if (diff.inMinutes < 1) return "just now";
-    if (diff.inMinutes < 60) return "${diff.inMinutes} mins ago";
-    if (diff.inHours < 24) return "${diff.inHours} hrs ago";
-    return "${diff.inDays} days ago";
+    if (diff.inMinutes < 1) return "vừa xong";
+    if (diff.inMinutes < 60) return "${diff.inMinutes} phút trước";
+    if (diff.inHours < 24) return "${diff.inHours} giờ trước";
+    return "${diff.inDays} ngày trước";
   }
 }

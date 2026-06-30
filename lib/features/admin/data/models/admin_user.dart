@@ -10,11 +10,11 @@ extension UserRoleX on UserRole {
   String get label {
     switch (this) {
       case UserRole.admin:
-        return "Admin";
+        return "Quản trị";
       case UserRole.user:
-        return "User";
+        return "Người dùng";
       case UserRole.guest:
-        return "Guest";
+        return "Khách";
     }
   }
 
@@ -69,9 +69,9 @@ extension UserStatusX on UserStatus {
   String get label {
     switch (this) {
       case UserStatus.active:
-        return "Active";
+        return "Hoạt động";
       case UserStatus.suspended:
-        return "Suspended";
+        return "Đã khóa";
     }
   }
 

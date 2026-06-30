@@ -1,23 +1,42 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import '../../../../core/network/api_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
+import '../../../../core/network/api_config.dart';
 import '../models/moderation_item.dart';
-import 'moderation_mock_data_source.dart';
 
-/// Nguồn dữ liệu THẬT cho Moderation — gọi API qua [ApiService].
+/// Nguồn dữ liệu cho Moderation — tự gọi HTTP qua [http.Client] inject vào.
 ///
 /// Endpoints:
 ///   GET  /api/admin/reports            -> mảng report
 ///   PUT  /api/admin/reports/{id}/status  body: { "status": "Approved" | "Rejected" | "Pending" }
-///
-/// LƯU Ý: hiện `GET /api/admin/reports` trả mảng rỗng và Swagger không khai báo
-/// schema. Map field dựa trên [ModerationItem.fromJson] (phòng thủ). Khi có
-/// report thật, chỉ cần chỉnh tên field trong fromJson cho khớp.
-class ModerationRemoteDataSource implements ModerationDataSource {
-  const ModerationRemoteDataSource();
+class ModerationRemoteDataSource {
+  final http.Client client;
+  final FlutterSecureStorage storage;
+
+  const ModerationRemoteDataSource({
+    required this.client,
+    required this.storage,
+  });
+
+  Future<Map<String, String>> _getHeaders({bool hasBody = false}) async {
+    final token = await storage.read(key: 'jwt_token');
+    final headers = <String, String>{};
+    if (hasBody) {
+      headers["Content-Type"] = "application/json";
+    }
+    if (token != null) {
+      headers["Authorization"] = "Bearer $token";
+    }
+    return headers;
+  }
 
   Future<List<ModerationItem>> _fetchAll() async {
-    final response = await ApiService.get("/admin/reports");
+    final headers = await _getHeaders();
+    final response = await client.get(
+      Uri.parse("${ApiConfig.baseUrl}/admin/reports"),
+      headers: headers,
+    );
     if (response.statusCode != 200) {
       throw Exception("Failed to load reports (${response.statusCode})");
     }
@@ -30,23 +49,22 @@ class ModerationRemoteDataSource implements ModerationDataSource {
         .toList();
   }
 
-  @override
   Future<List<ModerationItem>> getQueue() async {
     final all = await _fetchAll();
     return all.where((r) => r.status == ModerationStatus.pending).toList();
   }
 
-  @override
   Future<List<ModerationItem>> getResolved() async {
     final all = await _fetchAll();
     return all.where((r) => r.status != ModerationStatus.pending).toList();
   }
 
-  @override
   Future<void> updateStatus(String id, ModerationStatus status) async {
-    final response = await ApiService.put(
-      "/admin/reports/$id/status",
-      {"status": _toApiStatus(status)},
+    final headers = await _getHeaders(hasBody: true);
+    final response = await client.put(
+      Uri.parse("${ApiConfig.baseUrl}/admin/reports/$id/status"),
+      headers: headers,
+      body: jsonEncode({"status": _toApiStatus(status)}),
     );
     if (response.statusCode != 200 && kDebugMode) {
       debugPrint("updateStatus failed: ${response.statusCode} ${response.body}");

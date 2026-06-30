@@ -1,21 +1,20 @@
 import '../../domain/repositories/moderation_repository.dart';
-import '../datasources/moderation_mock_data_source.dart';
+import '../datasources/moderation_remote_data_source.dart';
 import '../models/moderation_item.dart';
 
-/// Hiện thực [ModerationRepository] — ủy quyền cho [ModerationDataSource]
-/// (mock hoặc remote, chọn ở DI).
+/// Hiện thực [ModerationRepository] — ủy quyền cho [ModerationRemoteDataSource].
 class ModerationRepositoryImpl implements ModerationRepository {
-  final ModerationDataSource dataSource;
+  final ModerationRemoteDataSource remoteDataSource;
 
-  ModerationRepositoryImpl(this.dataSource);
-
-  @override
-  Future<List<ModerationItem>> getQueue() => dataSource.getQueue();
+  ModerationRepositoryImpl(this.remoteDataSource);
 
   @override
-  Future<List<ModerationItem>> getResolved() => dataSource.getResolved();
+  Future<List<ModerationItem>> getQueue() => remoteDataSource.getQueue();
+
+  @override
+  Future<List<ModerationItem>> getResolved() => remoteDataSource.getResolved();
 
   @override
   Future<void> updateStatus(String id, ModerationStatus status) =>
-      dataSource.updateStatus(id, status);
+      remoteDataSource.updateStatus(id, status);
 }

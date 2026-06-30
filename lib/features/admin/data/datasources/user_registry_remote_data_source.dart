@@ -1,21 +1,39 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import '../../../../core/network/api_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
+import '../../../../core/network/api_config.dart';
 import '../models/admin_user.dart';
-import 'user_registry_mock_data_source.dart';
 
-/// Nguồn dữ liệu THẬT cho User Registry — gọi API qua [ApiService]
-/// (tự đính kèm Bearer token).
+/// Nguồn dữ liệu cho User Registry — tự gọi HTTP qua [http.Client] inject vào
+/// (dễ test/mock), tự đính kèm Bearer token đọc từ [FlutterSecureStorage].
 ///
 /// Endpoints:
 ///   GET    /api/admin/users?Search=&Status=&RoleId=&Page=&PageSize=
 ///   PUT    /api/admin/users/{id}/status   body: { "status": "Active" | "Banned" }
 ///   PUT    /api/admin/users/{id}/role     body: { "roleId": 1 | 2 }
 ///   DELETE /api/admin/users/{id}
-class UserRegistryRemoteDataSource implements UserRegistryDataSource {
-  const UserRegistryRemoteDataSource();
+class UserRegistryRemoteDataSource {
+  final http.Client client;
+  final FlutterSecureStorage storage;
 
-  @override
+  const UserRegistryRemoteDataSource({
+    required this.client,
+    required this.storage,
+  });
+
+  Future<Map<String, String>> _getHeaders({bool hasBody = false}) async {
+    final token = await storage.read(key: 'jwt_token');
+    final headers = <String, String>{};
+    if (hasBody) {
+      headers["Content-Type"] = "application/json";
+    }
+    if (token != null) {
+      headers["Authorization"] = "Bearer $token";
+    }
+    return headers;
+  }
+
   Future<PaginatedUsers> fetchUsers({
     int page = 1,
     int pageSize = 8,
@@ -35,7 +53,11 @@ class UserRegistryRemoteDataSource implements UserRegistryDataSource {
       query.write("&RoleId=$roleId");
     }
 
-    final response = await ApiService.get(query.toString());
+    final headers = await _getHeaders();
+    final response = await client.get(
+      Uri.parse("${ApiConfig.baseUrl}$query"),
+      headers: headers,
+    );
     if (response.statusCode != 200) {
       throw Exception("Failed to load users (${response.statusCode})");
     }
@@ -54,33 +76,38 @@ class UserRegistryRemoteDataSource implements UserRegistryDataSource {
     );
   }
 
-  @override
   Future<void> setStatus(String id, UserStatus status) async {
     // Backend dùng "Active" / "Banned".
     final apiStatus = status == UserStatus.suspended ? "Banned" : "Active";
-    final response = await ApiService.put(
-      "/admin/users/$id/status",
-      {"status": apiStatus},
+    final headers = await _getHeaders(hasBody: true);
+    final response = await client.put(
+      Uri.parse("${ApiConfig.baseUrl}/admin/users/$id/status"),
+      headers: headers,
+      body: jsonEncode({"status": apiStatus}),
     );
     if (response.statusCode != 200 && kDebugMode) {
       debugPrint("setStatus failed: ${response.statusCode} ${response.body}");
     }
   }
 
-  @override
   Future<void> changeRole(String id, int roleId) async {
-    final response = await ApiService.put(
-      "/admin/users/$id/role",
-      {"roleId": roleId},
+    final headers = await _getHeaders(hasBody: true);
+    final response = await client.put(
+      Uri.parse("${ApiConfig.baseUrl}/admin/users/$id/role"),
+      headers: headers,
+      body: jsonEncode({"roleId": roleId}),
     );
     if (response.statusCode != 200 && kDebugMode) {
       debugPrint("changeRole failed: ${response.statusCode} ${response.body}");
     }
   }
 
-  @override
   Future<void> deleteUser(String id) async {
-    final response = await ApiService.delete("/admin/users/$id");
+    final headers = await _getHeaders();
+    final response = await client.delete(
+      Uri.parse("${ApiConfig.baseUrl}/admin/users/$id"),
+      headers: headers,
+    );
     if (response.statusCode != 200 && response.statusCode != 204 && kDebugMode) {
       debugPrint("deleteUser failed: ${response.statusCode} ${response.body}");
     }

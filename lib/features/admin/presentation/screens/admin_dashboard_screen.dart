@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import 'user_registry_screen.dart';
 import 'content_moderation_screen.dart';
 import 'analytics_overview_screen.dart';
-import 'system_alerts_screen.dart';
 
 /// Khung điều hướng chính của khu vực Admin.
 ///
-/// Bottom nav gồm 4 nút: Users · Moderation · Analytics · Alerts.
+/// Bottom nav gồm 3 nút: Users · Moderation · Analytics.
 /// Dùng [IndexedStack] để giữ trạng thái từng tab khi chuyển qua lại.
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -31,7 +30,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       const ContentModerationScreen(),
       // "Review queue" trên dashboard chuyển thẳng sang tab Moderation.
       AnalyticsOverviewScreen(onOpenModeration: () => _goToTab(1)),
-      const SystemAlertsScreen(),
     ];
 
     return Scaffold(
@@ -100,10 +98,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _navItem(0, Icons.people_alt_outlined, "Users"),
-              _navItem(1, Icons.gavel_outlined, "Moderation"),
-              _navItem(2, Icons.bar_chart_outlined, "Analytics"),
-              _navItem(3, Icons.notifications_none, "Alerts"),
+              _navItem(0, Icons.people_alt_outlined, "Người dùng"),
+              _navItem(1, Icons.gavel_outlined, "Kiểm duyệt"),
+              _navItem(2, Icons.bar_chart_outlined, "Thống kê"),
             ],
           ),
         ),

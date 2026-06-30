@@ -16,13 +16,13 @@ extension ModerationFlagTypeX on ModerationFlagType {
   String get label {
     switch (this) {
       case ModerationFlagType.inaccurateDetection:
-        return "INACCURATE DETECTION";
+        return "PHÁT HIỆN SAI";
       case ModerationFlagType.inappropriateAdvice:
-        return "INAPPROPRIATE ADVICE";
+        return "TƯ VẤN KHÔNG PHÙ HỢP";
       case ModerationFlagType.spam:
-        return "SPAM / ABUSE";
+        return "SPAM / LẠM DỤNG";
       case ModerationFlagType.other:
-        return "OTHER";
+        return "KHÁC";
     }
   }
 

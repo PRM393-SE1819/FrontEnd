@@ -2,9 +2,8 @@ import '../../data/models/moderation_item.dart';
 
 /// Hợp đồng (interface) cho dữ liệu kiểm duyệt.
 ///
-/// Hiện tại được hiện thực bằng mock data ([ModerationRepositoryImpl] dùng
-/// mock data source). Khi có API thật, chỉ cần tạo một remote data source mới
-/// và đổi trong DI — phần UI không phải sửa gì.
+/// Được hiện thực bởi [ModerationRepositoryImpl] (gọi API qua remote data
+/// source). Phần UI chỉ phụ thuộc vào interface này.
 abstract class ModerationRepository {
   /// Các mục đang chờ xử lý (tab "Action Queue").
   Future<List<ModerationItem>> getQueue();

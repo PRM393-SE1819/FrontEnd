@@ -5,8 +5,8 @@ import '../../domain/repositories/analytics_repository.dart';
 
 /// Màn hình "Analytics Overview" — dashboard tổng quan cho admin.
 ///
-/// Dữ liệu lấy qua [AnalyticsRepository] (hiện là mock). Gồm các section:
-/// chỉ số KPI, System Health, System Controls, Moderation Queue, Security Log.
+/// Dữ liệu lấy qua [AnalyticsRepository] (API `GET /api/admin/dashboard`).
+/// Gồm các section: chỉ số KPI, System Controls, Moderation Queue.
 class AnalyticsOverviewScreen extends StatefulWidget {
   /// Gọi khi bấm "Review queue" -> chuyển sang tab Moderation của shell.
   final VoidCallback? onOpenModeration;
@@ -46,7 +46,7 @@ class _AnalyticsOverviewScreenState extends State<AnalyticsOverviewScreen> {
   void _notImplemented(String label) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text("$label (coming soon)"),
+        content: Text("$label (sắp ra mắt)"),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
       ),
@@ -69,22 +69,13 @@ class _AnalyticsOverviewScreenState extends State<AnalyticsOverviewScreen> {
           const SizedBox(height: 16),
           ...data.metrics.map(_metricCard),
           const SizedBox(height: 8),
-          _sectionTitle("System Health", onRefresh: _loadData),
-          const SizedBox(height: 12),
-          _healthSection(data.health),
-          const SizedBox(height: 20),
-          _sectionTitle("System Controls", trailingIcon: Icons.settings),
+          _sectionTitle("Điều khiển hệ thống", trailingIcon: Icons.settings),
           const SizedBox(height: 12),
           _controlsSection(),
           const SizedBox(height: 20),
-          _sectionTitle("Moderation Queue"),
+          _sectionTitle("Hàng đợi kiểm duyệt"),
           const SizedBox(height: 12),
           _moderationSection(data.moderation),
-          const SizedBox(height: 20),
-          _sectionTitle("Security & System Log",
-              trailingText: "See All", onTrailingTap: () => _notImplemented("Full log")),
-          const SizedBox(height: 12),
-          _logSection(data.logs),
         ],
       ),
     );
@@ -97,7 +88,7 @@ class _AnalyticsOverviewScreenState extends State<AnalyticsOverviewScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          "Analytics Overview",
+          "Tổng quan thống kê",
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.w800,
@@ -106,7 +97,7 @@ class _AnalyticsOverviewScreenState extends State<AnalyticsOverviewScreen> {
         ),
         const SizedBox(height: 4),
         Text(
-          "System status and key metrics for today.",
+          "Tình trạng hệ thống và chỉ số chính hôm nay.",
           style: TextStyle(fontSize: 13, color: Colors.grey[600]),
         ),
         const SizedBox(height: 4),
@@ -185,78 +176,13 @@ class _AnalyticsOverviewScreenState extends State<AnalyticsOverviewScreen> {
     );
   }
 
-  // ---------- System Health ----------
-
-  Widget _healthSection(List<HealthIndicator> items) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 18),
-      decoration: _cardDecoration(),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: items.map(_healthGauge).toList(),
-      ),
-    );
-  }
-
-  Widget _healthGauge(HealthIndicator item) {
-    final hasLoad = item.loadPercent != null;
-    final value = hasLoad ? item.loadPercent! / 100 : 1.0;
-    return Column(
-      children: [
-        SizedBox(
-          width: 56,
-          height: 56,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              SizedBox(
-                width: 56,
-                height: 56,
-                child: CircularProgressIndicator(
-                  value: value,
-                  strokeWidth: 5,
-                  backgroundColor: Colors.grey[200],
-                  valueColor: AlwaysStoppedAnimation(item.status.color),
-                ),
-              ),
-              hasLoad
-                  ? Text(
-                      "${item.loadPercent}%",
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: item.status.color,
-                      ),
-                    )
-                  : Icon(item.icon, size: 22, color: item.status.color),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          item.name,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: _textDark,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          hasLoad ? "Processing Load" : item.status.label,
-          style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-        ),
-      ],
-    );
-  }
-
   // ---------- System Controls ----------
 
   Widget _controlsSection() {
     final controls = [
-      (Icons.cleaning_services_outlined, "Clear Cache"),
-      (Icons.receipt_long_outlined, "Request Logs"),
-      (Icons.backup_outlined, "Backup Now"),
+      (Icons.cleaning_services_outlined, "Xóa bộ nhớ đệm"),
+      (Icons.receipt_long_outlined, "Yêu cầu nhật ký"),
+      (Icons.backup_outlined, "Sao lưu ngay"),
     ];
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
@@ -308,14 +234,14 @@ class _AnalyticsOverviewScreenState extends State<AnalyticsOverviewScreen> {
           _moderationRow(
             Icons.flag,
             const Color(0xFFE53E3E),
-            "Flagged Meal Reports",
+            "Báo cáo bữa ăn bị gắn cờ",
             summary.flaggedMealReports,
           ),
           const Divider(height: 24),
           _moderationRow(
             Icons.smart_toy_outlined,
             const Color(0xFFDD6B20),
-            "AI Chat Anomalies",
+            "Bất thường trò chuyện AI",
             summary.aiChatAnomalies,
           ),
           const SizedBox(height: 16),
@@ -323,7 +249,7 @@ class _AnalyticsOverviewScreenState extends State<AnalyticsOverviewScreen> {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: widget.onOpenModeration ??
-                  () => _notImplemented("Review queue"),
+                  () => _notImplemented("Xem hàng đợi"),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _primaryGreen,
                 foregroundColor: Colors.white,
@@ -333,7 +259,7 @@ class _AnalyticsOverviewScreenState extends State<AnalyticsOverviewScreen> {
                 ),
               ),
               child: const Text(
-                "Review queue",
+                "Xem hàng đợi",
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
@@ -377,101 +303,9 @@ class _AnalyticsOverviewScreenState extends State<AnalyticsOverviewScreen> {
     );
   }
 
-  // ---------- Security log ----------
-
-  Widget _logSection(List<SecurityLog> logs) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      decoration: _cardDecoration(),
-      child: logs.isEmpty
-          ? Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Column(
-                children: [
-                  Icon(Icons.event_note_outlined,
-                      size: 36, color: Colors.grey[400]),
-                  const SizedBox(height: 8),
-                  Text(
-                    "No recent system events",
-                    style: TextStyle(fontSize: 13, color: Colors.grey[500]),
-                  ),
-                ],
-              ),
-            )
-          : Column(
-              children: [
-                for (int i = 0; i < logs.length; i++) ...[
-                  if (i > 0) Divider(height: 1, color: Colors.grey[100]),
-                  _logRow(logs[i]),
-                ],
-              ],
-            ),
-    );
-  }
-
-  Widget _logRow(SecurityLog log) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(log.type.icon, size: 18, color: log.type.color),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      _formatTime(log.time),
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[500],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: log.type.color.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        log.type.label,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: log.type.color,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  log.description,
-                  style: const TextStyle(fontSize: 13, color: _textDark),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ---------- Helpers ----------
 
-  Widget _sectionTitle(
-    String title, {
-    IconData? trailingIcon,
-    String? trailingText,
-    VoidCallback? onRefresh,
-    VoidCallback? onTrailingTap,
-  }) {
+  Widget _sectionTitle(String title, {IconData? trailingIcon}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -483,25 +317,8 @@ class _AnalyticsOverviewScreenState extends State<AnalyticsOverviewScreen> {
             color: _textDark,
           ),
         ),
-        if (onRefresh != null)
-          InkWell(
-            onTap: onRefresh,
-            child: Icon(Icons.refresh, size: 20, color: Colors.grey[500]),
-          )
-        else if (trailingIcon != null)
-          Icon(trailingIcon, size: 20, color: Colors.grey[500])
-        else if (trailingText != null)
-          InkWell(
-            onTap: onTrailingTap,
-            child: Text(
-              trailingText,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: _primaryGreen,
-              ),
-            ),
-          ),
+        if (trailingIcon != null)
+          Icon(trailingIcon, size: 20, color: Colors.grey[500]),
       ],
     );
   }
@@ -522,20 +339,9 @@ class _AnalyticsOverviewScreenState extends State<AnalyticsOverviewScreen> {
 
   String _formatDate(DateTime d) {
     const weekdays = [
-      "Monday", "Tuesday", "Wednesday", "Thursday",
-      "Friday", "Saturday", "Sunday",
+      "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm",
+      "Thứ Sáu", "Thứ Bảy", "Chủ Nhật",
     ];
-    const months = [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December",
-    ];
-    return "${weekdays[d.weekday - 1]}, ${months[d.month - 1]} ${d.day}, ${d.year}";
-  }
-
-  String _formatTime(DateTime t) {
-    final hour12 = t.hour % 12 == 0 ? 12 : t.hour % 12;
-    final period = t.hour < 12 ? "AM" : "PM";
-    final minute = t.minute.toString().padLeft(2, '0');
-    return "$hour12:$minute $period";
+    return "${weekdays[d.weekday - 1]}, ngày ${d.day} tháng ${d.month} năm ${d.year}";
   }
 }

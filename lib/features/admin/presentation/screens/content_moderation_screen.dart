@@ -6,8 +6,7 @@ import '../widgets/moderation_card.dart';
 
 /// Màn hình "Moderation Queue" — hàng đợi kiểm duyệt nội dung.
 ///
-/// Lấy dữ liệu qua [ModerationRepository] (hiện là mock). Khi nối API thật,
-/// chỉ cần đổi data source trong DI, màn hình này không phải sửa.
+/// Lấy dữ liệu qua [ModerationRepository] (API `/api/admin/reports`).
 class ContentModerationScreen extends StatefulWidget {
   const ContentModerationScreen({super.key});
 
@@ -74,13 +73,13 @@ class _ContentModerationScreenState extends State<ContentModerationScreen>
   String _statusVerb(ModerationStatus status) {
     switch (status) {
       case ModerationStatus.approved:
-        return "Approved";
+        return "Đã duyệt";
       case ModerationStatus.rejected:
-        return "Rejected";
+        return "Đã từ chối";
       case ModerationStatus.escalated:
-        return "Escalated";
+        return "Đã chuyển cấp";
       case ModerationStatus.pending:
-        return "Pending";
+        return "Đang chờ";
     }
   }
 
@@ -95,7 +94,7 @@ class _ContentModerationScreenState extends State<ContentModerationScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                "Moderation Queue",
+                "Hàng đợi kiểm duyệt",
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w800,
@@ -116,8 +115,8 @@ class _ContentModerationScreenState extends State<ContentModerationScreen>
           indicatorWeight: 3,
           labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
           tabs: const [
-            Tab(text: "Action Queue"),
-            Tab(text: "Resolved"),
+            Tab(text: "Cần xử lý"),
+            Tab(text: "Đã xử lý"),
           ],
         ),
         Expanded(
@@ -151,7 +150,7 @@ class _ContentModerationScreenState extends State<ContentModerationScreen>
               size: 15, color: Color(0xFFDD6B20)),
           const SizedBox(width: 6),
           Text(
-            "${_queue.length} Pending Review",
+            "${_queue.length} mục chờ duyệt",
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,
@@ -197,7 +196,7 @@ class _ContentModerationScreenState extends State<ContentModerationScreen>
           ),
           const SizedBox(height: 12),
           Text(
-            isQueue ? "All caught up!" : "No resolved items yet",
+            isQueue ? "Đã xử lý hết!" : "Chưa có mục nào được xử lý",
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,

@@ -44,13 +44,13 @@ class UserCard extends StatelessWidget {
           children: [
             _buildIdentity(),
             const SizedBox(height: 12),
-            _infoRow("Role:", _roleBadge()),
+            _infoRow("Vai trò:", _roleBadge()),
             const SizedBox(height: 8),
-            _infoRow("Status:", _statusBadge()),
+            _infoRow("Trạng thái:", _statusBadge()),
             const SizedBox(height: 8),
             Row(
               children: [
-                Expanded(child: _infoRow("Active:", _activeText())),
+                Expanded(child: _infoRow("Hoạt động:", _activeText())),
                 _actionButtons(),
               ],
             ),
@@ -118,7 +118,7 @@ class UserCard extends StatelessWidget {
     return Row(
       children: [
         SizedBox(
-          width: 56,
+          width: 84,
           child: Text(
             label,
             style: TextStyle(
@@ -202,7 +202,7 @@ class UserCard extends StatelessWidget {
           onPressed: onEdit,
           visualDensity: VisualDensity.compact,
           icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF718096)),
-          tooltip: "Edit",
+          tooltip: "Sửa",
         ),
         IconButton(
           onPressed: onToggleStatus,
@@ -212,7 +212,7 @@ class UserCard extends StatelessWidget {
             size: 18,
             color: isSuspended ? const Color(0xFF006D44) : const Color(0xFFE53E3E),
           ),
-          tooltip: isSuspended ? "Activate" : "Suspend",
+          tooltip: isSuspended ? "Mở khóa" : "Khóa",
         ),
       ],
     );
@@ -220,16 +220,12 @@ class UserCard extends StatelessWidget {
 
   String _formatLastActive(DateTime time) {
     final diff = DateTime.now().difference(time);
-    if (diff.inSeconds < 60) return "Just now";
-    if (diff.inMinutes < 60) return "${diff.inMinutes} mins ago";
-    if (diff.inHours < 24) return "${diff.inHours} hours ago";
+    if (diff.inSeconds < 60) return "Vừa xong";
+    if (diff.inMinutes < 60) return "${diff.inMinutes} phút trước";
+    if (diff.inHours < 24) return "${diff.inHours} giờ trước";
     if (diff.inDays < 7) {
-      return diff.inDays == 1 ? "1 day ago" : "${diff.inDays} days ago";
+      return diff.inDays == 1 ? "1 ngày trước" : "${diff.inDays} ngày trước";
     }
-    const months = [
-      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-    ];
-    return "${months[time.month - 1]} ${time.day}, ${time.year}";
+    return "${time.day} thg ${time.month}, ${time.year}";
   }
 }

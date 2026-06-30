@@ -1,15 +1,12 @@
 import '../../domain/repositories/user_registry_repository.dart';
-import '../datasources/user_registry_mock_data_source.dart';
+import '../datasources/user_registry_remote_data_source.dart';
 import '../models/admin_user.dart';
 
-/// Hiện thực [UserRegistryRepository] — chỉ ủy quyền cho data source.
-///
-/// Nhận [UserRegistryDataSource] (interface), nên hoạt động được với cả
-/// mock lẫn remote. Việc chọn dùng cái nào nằm ở DI.
+/// Hiện thực [UserRegistryRepository] — ủy quyền cho [UserRegistryRemoteDataSource].
 class UserRegistryRepositoryImpl implements UserRegistryRepository {
-  final UserRegistryDataSource dataSource;
+  final UserRegistryRemoteDataSource remoteDataSource;
 
-  UserRegistryRepositoryImpl(this.dataSource);
+  UserRegistryRepositoryImpl(this.remoteDataSource);
 
   @override
   Future<PaginatedUsers> getUsers({
@@ -19,7 +16,7 @@ class UserRegistryRepositoryImpl implements UserRegistryRepository {
     UserStatus? status,
     int? roleId,
   }) {
-    return dataSource.fetchUsers(
+    return remoteDataSource.fetchUsers(
       page: page,
       pageSize: pageSize,
       search: search,
@@ -30,16 +27,16 @@ class UserRegistryRepositoryImpl implements UserRegistryRepository {
 
   @override
   Future<void> setUserStatus(String id, UserStatus status) {
-    return dataSource.setStatus(id, status);
+    return remoteDataSource.setStatus(id, status);
   }
 
   @override
   Future<void> changeUserRole(String id, int roleId) {
-    return dataSource.changeRole(id, roleId);
+    return remoteDataSource.changeRole(id, roleId);
   }
 
   @override
   Future<void> deleteUser(String id) {
-    return dataSource.deleteUser(id);
+    return remoteDataSource.deleteUser(id);
   }
 }
